@@ -13,11 +13,17 @@
         "react-dom": "^17.0.2",
         "react-moment": "^1.1.2",
         "react-scripts": "5.0.0",
-        "typescript": "^4.6.4"
+        "typescript": "^4.6.4",
+        "recharts": "^2.6.2",
+        "axios": "^1.4.0"
     },
     "scripts": {
         "start": "react-scripts start",
+        "start:mock": "cross-env REACT_APP_USE_MOCK=true PORT=3001 react-scripts start",
         "build": "react-scripts build"
+    },
+    "devDependencies": {
+        "cross-env": "^7.0.3"
     },
     "eslintConfig": {
         "extends": "react-app"

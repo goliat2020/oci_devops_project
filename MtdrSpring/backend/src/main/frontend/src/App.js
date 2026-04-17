@@ -12,9 +12,26 @@
  */
 import React, { useState, useEffect } from 'react';
 import NewItem from './NewItem';
-import API_LIST from './API';
+import API from './API';
+import KpiDashboard from './KpiDashboard';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Button, TableBody, CircularProgress } from '@mui/material';
+import CheckIcon from '@mui/icons-material/CheckCircleOutline';
+import UndoIcon from '@mui/icons-material/Undo';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  Grid,
+  Paper,
+  Button,
+  CircularProgress,
+  IconButton,
+  Card,
+  CardContent,
+  CardActions,
+  Box
+} from '@mui/material';
 import Moment from 'react-moment';
 
 /* In this application we're using Function Components with the State Hooks
@@ -37,28 +54,12 @@ function App() {
     const [error, setError] = useState();
 
     function deleteItem(deleteId) {
-      // console.log("deleteItem("+deleteId+")")
-      fetch(API_LIST+"/"+deleteId, {
-        method: 'DELETE',
-      })
-      .then(response => {
-        // console.log("response=");
-        // console.log(response);
-        if (response.ok) {
-          // console.log("deleteItem FETCH call is ok");
-          return response;
-        } else {
-          throw new Error('Something went wrong ...');
-        }
-      })
-      .then(
-        (result) => {
+      API.remove(deleteId).then(
+        () => {
           const remainingItems = items.filter(item => item.id !== deleteId);
           setItems(remainingItems);
         },
-        (error) => {
-          setError(error);
-        }
+        (error) => { setError(error); }
       );
     }
     function toggleDone(event, id, description, done) {
@@ -69,48 +70,22 @@ function App() {
       );
     }
     function reloadOneIteam(id){
-      fetch(API_LIST+"/"+id)
-        .then(response => {
-          if (response.ok) {
-            return response.json();
-          } else {
-            throw new Error('Something went wrong ...');
-          }
-        })
-        .then(
-          (result) => {
-            const items2 = items.map(
-              x => (x.id === id ? {
-                 ...x,
-                 'description':result.description,
-                 'done': result.done
-                } : x));
-            setItems(items2);
-          },
-          (error) => {
-            setError(error);
-          });
+      API.get(id).then(
+        (result) => {
+          const items2 = items.map(
+            x => (x.id === id ? {
+               ...x,
+               'description':result.description,
+               'done': result.done
+              } : x));
+          setItems(items2);
+        },
+        (error) => { setError(error); }
+      );
     }
     function modifyItem(id, description, done) {
-      // console.log("deleteItem("+deleteId+")")
       var data = {"description": description, "done": done};
-      return fetch(API_LIST+"/"+id, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      })
-      .then(response => {
-        // console.log("response=");
-        // console.log(response);
-        if (response.ok) {
-          // console.log("deleteItem FETCH call is ok");
-          return response;
-        } else {
-          throw new Error('Something went wrong ...');
-        }
-      });
+      return API.update(id, data);
     }
     /*
     To simulate slow network, call sleep before making API calls.
@@ -121,23 +96,10 @@ function App() {
     useEffect(() => {
       setLoading(true);
       // sleep(5000).then(() => {
-      fetch(API_LIST)
-        .then(response => {
-          if (response.ok) {
-            return response.json();
-          } else {
-            throw new Error('Something went wrong ...');
-          }
-        })
-        .then(
-          (result) => {
-            setLoading(false);
-            setItems(result);
-          },
-          (error) => {
-            setLoading(false);
-            setError(error);
-          });
+      API.list().then(
+        (result) => { setLoading(false); setItems(result); },
+        (error) => { setLoading(false); setError(error); }
+      );
 
       //})
     },
@@ -146,94 +108,95 @@ function App() {
        // this useEffect will run once
        // similar to componentDidMount()
     );
-    function addItem(text){
-      console.log("addItem("+text+")")
+    function addItem(payload){
+      // payload can be a simple string (old UI) or an object with full ToDoItem fields
+      console.log("addItem("+JSON.stringify(payload)+")")
       setInserting(true);
-      var data = {};
-      console.log(data);
-      data.description = text;
-      fetch(API_LIST, {
-        method: 'POST',
-        // We convert the React state to JSON and send it as the POST body
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data),
-      }).then((response) => {
-        // This API doens't return a JSON document
-        console.log(response);
-        console.log();
-        console.log(response.headers.location);
-        // return response.json();
-        if (response.ok) {
-          return response;
-        } else {
-          throw new Error('Something went wrong ...');
-        }
-      }).then(
+      let data;
+      let displayDescription = '';
+      if (typeof payload === 'string') {
+        data = { description: payload };
+        displayDescription = payload;
+      } else if (typeof payload === 'object') {
+        // pass the object as-is (API.create mock handles full shape)
+        data = payload;
+        displayDescription = payload.descripcion || payload.titulo || payload.description || '';
+      } else {
+        data = { description: String(payload) };
+        displayDescription = String(payload);
+      }
+      API.create(data).then(
         (result) => {
-          var id = result.headers.get('location');
-          var newItem = {"id": id, "description": text}
+          let newItem;
+          if (result && result.headers && typeof result.headers.get === 'function') {
+            const id = result.headers.get('location');
+            newItem = { id: id, description: displayDescription };
+          } else if (result && result.id) {
+            newItem = result;
+          } else {
+            newItem = { id: String(Date.now()), description: displayDescription };
+          }
           setItems([newItem, ...items]);
           setInserting(false);
         },
-        (error) => {
-          setInserting(false);
-          setError(error);
-        }
+        (error) => { setInserting(false); setError(error); }
       );
     }
     return (
       <div className="App">
-        <h1>MY TODO LIST</h1>
-        <NewItem addItem={addItem} isInserting={isInserting}/>
-        { error &&
-          <p>Error: {error.message}</p>
-        }
-        { isLoading &&
-          <CircularProgress />
-        }
-        { !isLoading &&
-        <div id="maincontent">
-        <table id="itemlistNotDone" className="itemlist">
-          <TableBody>
-          {items.map(item => (
-            !item.done && (
-            <tr key={item.id}>
-              <td className="description">{item.description}</td>
-              { /*<td>{JSON.stringify(item, null, 2) }</td>*/ }
-              <td className="date"><Moment format="MMM Do hh:mm:ss">{item.createdAt}</Moment></td>
-              <td><Button variant="contained" className="DoneButton" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)} size="small">
-                    Done
-                  </Button></td>
-            </tr>
-          )))}
-          </TableBody>
-        </table>
-        <h2 id="donelist">
-          Done items
-        </h2>
-        <table id="itemlistDone" className="itemlist">
-          <TableBody>
-          {items.map(item => (
-            item.done && (
+        <AppBar position="static" elevation={1} sx={{ backgroundColor: '#CA0000', color: '#fff' }}>
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
+              Oracle Project Admin
+            </Typography>
+            <Typography variant="body2" color="textSecondary">Team dashboard</Typography>
+          </Toolbar>
+        </AppBar>
+        <Container className="app-container">
+          <Box className="hero">
+            <Typography variant="h4" gutterBottom>My Todo List</Typography>
+            <Typography variant="body2" color="textSecondary">A modernized interface to manage your tasks quickly. Use the input below to add tasks.</Typography>
+          </Box>
 
-            <tr key={item.id}>
-              <td className="description">{item.description}</td>
-              <td className="date"><Moment format="MMM Do hh:mm:ss">{item.createdAt}</Moment></td>
-              <td><Button variant="contained" className="DoneButton" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)} size="small">
-                    Undo
-                  </Button></td>
-              <td><Button startIcon={<DeleteIcon />} variant="contained" className="DeleteButton" onClick={() => deleteItem(item.id)} size="small">
-                    Delete
-                  </Button></td>
-            </tr>
-          )))}
-          </TableBody>
-        </table>
-        </div>
-        }
+          <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
+            <NewItem addItem={addItem} isInserting={isInserting} />
+          </Paper>
 
+          { error && <Typography color="error">Error: {error.message}</Typography> }
+
+          { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
+
+          { !isLoading && items.length === 0 && (
+            <Paper className="task-card empty-state">
+              <Typography>No tasks yet. Add your first task above.</Typography>
+            </Paper>
+          )}
+
+          <Grid container spacing={2}>
+            {items.map(item => (
+              <Grid item xs={12} sm={6} md={4} key={item.id}>
+                <Card className="task-card">
+                  <CardContent>
+                    <Typography className="task-desc">{item.description}</Typography>
+                    <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
+                  </CardContent>
+                  <CardActions>
+                    <div className="task-actions">
+                      <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
+                        {item.done ? <UndoIcon /> : <CheckIcon />}
+                      </IconButton>
+                      <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Delete</Button>
+                    </div>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* KPI Dashboard for Tasks / Hours */}
+          <KpiDashboard />
+
+        </Container>
       </div>
     );
 }
