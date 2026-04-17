@@ -8,7 +8,7 @@ resource "oci_containerengine_cluster" "mtdrworkshop_cluster" {
     ]
     subnet_id = oci_core_subnet.endpoint.id
   }
-  kubernetes_version  = "v1.35.0"
+  kubernetes_version  = "v1.34.2"
   name                = "mtdrworkshopcluster-${var.mtdrKey}"
   vcn_id              = oci_core_vcn.okevcn.id
   #optional
