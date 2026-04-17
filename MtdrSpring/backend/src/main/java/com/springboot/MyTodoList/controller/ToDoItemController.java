@@ -18,6 +18,11 @@ public class ToDoItemController {
     public List<ToDoItem> getAllToDoItems(){
         return toDoItemService.findAll();
     }
+
+    @GetMapping(value = "/tasks")
+    public List<ToDoItem> getAllTasks(){
+        return toDoItemService.findAll();
+    }
     //@CrossOrigin
     @GetMapping(value = "/todolist/{id}")
     public ResponseEntity<ToDoItem> getToDoItemById(@PathVariable int id){
@@ -27,6 +32,11 @@ public class ToDoItemController {
         }catch (Exception e){
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+    }
+
+    @GetMapping(value = "/tasks/{id}")
+    public ResponseEntity<ToDoItem> getTaskById(@PathVariable int id){
+        return getToDoItemById(id);
     }
     //@CrossOrigin
     @PostMapping(value = "/todolist")
@@ -40,6 +50,11 @@ public class ToDoItemController {
         return ResponseEntity.ok()
                 .headers(responseHeaders).build();
     }
+
+    @PostMapping(value = "/tasks")
+    public ResponseEntity<ToDoItem> addTask(@RequestBody ToDoItem todoItem) throws Exception{
+        return addToDoItem(todoItem);
+    }
     //@CrossOrigin
     @PutMapping(value = "todolist/{id}")
     public ResponseEntity<ToDoItem> updateToDoItem(@RequestBody ToDoItem toDoItem, @PathVariable int id){
@@ -51,6 +66,11 @@ public class ToDoItemController {
             return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
         }
     }
+
+    @PutMapping(value = "tasks/{id}")
+    public ResponseEntity<ToDoItem> updateTask(@RequestBody ToDoItem toDoItem, @PathVariable int id){
+        return updateToDoItem(toDoItem, id);
+    }
     //@CrossOrigin
     @DeleteMapping(value = "todolist/{id}")
     public ResponseEntity<Boolean> deleteToDoItem(@PathVariable("id") int id){
@@ -61,6 +81,11 @@ public class ToDoItemController {
         }catch (Exception e){
             return new ResponseEntity<>(flag,HttpStatus.NOT_FOUND);
         }
+    }
+
+    @DeleteMapping(value = "tasks/{id}")
+    public ResponseEntity<Boolean> deleteTask(@PathVariable("id") int id){
+        return deleteToDoItem(id);
     }
 
 
