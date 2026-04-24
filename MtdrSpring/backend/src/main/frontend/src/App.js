@@ -155,7 +155,7 @@ function App() {
         <Container className="app-container">
           <Box className="hero">
             <Typography variant="h4" gutterBottom>My Todo List</Typography>
-            <Typography variant="body2" color="textSecondary">A modernized interface to manage your tasks quickly. Use the input below to add tasks.</Typography>
+            <Typography variant="body2" color="textSecondary">HOLA</Typography>
           </Box>
 
           <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
