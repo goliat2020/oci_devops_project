@@ -291,8 +291,18 @@ fi
 
 
 # Get MTDR_DB OCID
+if state_done MTDR_DB_OCID; then
+  if ! oci db autonomous-database get --autonomous-database-id "$(state_get MTDR_DB_OCID)" >/dev/null 2>&1; then
+    echo "WARNING: Existing MTDR_DB_OCID in state is not accessible. Resetting to rediscover DB OCID."
+    state_reset MTDR_DB_OCID
+  fi
+fi
+
 while ! state_done MTDR_DB_OCID; do
-  MTDR_DB_OCID=`oci db autonomous-database list --compartment-id "$(cat state/COMPARTMENT_OCID)" --query 'join('"' '"',data[?"display-name"=='"'MTDRDB'"'].id)' --raw-output`
+  MTDR_DB_OCID=`oci db autonomous-database list --compartment-id "$(state_get COMPARTMENT_OCID)" --query 'data[?"db-name"=='"'"$(state_get MTDR_DB_NAME)"'"'] | [0].id' --raw-output`
+  if test -z "$MTDR_DB_OCID" || test "$MTDR_DB_OCID" == "null"; then
+    MTDR_DB_OCID=`oci db autonomous-database list --compartment-id "$(state_get COMPARTMENT_OCID)" --query 'data[?"display-name"=='"'MTDRDB'"'] | [0].id' --raw-output`
+  fi
   if [[ "$MTDR_DB_OCID" =~ ocid1.autonomousdatabase* ]]; then
     state_set MTDR_DB_OCID "$MTDR_DB_OCID"
   else
@@ -347,7 +357,12 @@ while ! state_done MTDR_DB_PASSWORD_SET; do
   umask 177
   echo '{"adminPassword": "'"$DB_PASSWORD"'"}' > temp_params
   umask 22
-  oci db autonomous-database update --autonomous-database-id "$(state_get MTDR_DB_OCID)" --from-json "file://temp_params" >/dev/null
+  if oci db autonomous-database update --autonomous-database-id "$(state_get MTDR_DB_OCID)" --from-json "file://temp_params" >/dev/null; then
+    echo "admin password updated successfully"
+  else
+    echo "WARNING: Could not update ATP admin password (NotAuthorizedOrNotFound or missing permission)."
+    echo "WARNING: Continuing setup and assuming provided DB password is already valid for ADMIN."
+  fi
   rm temp_params
   state_set_done MTDR_DB_PASSWORD_SET
 done
