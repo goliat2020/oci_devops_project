@@ -29,7 +29,14 @@ while ! state_done RUN_TYPE; do
     state_set_done PROVISIONING
     state_set_done K8S_PROVISIONING
     state_set RUN_NAME "mtdrworkshop$(state_get RESERVATION_ID)"
-    state_set MTDR_DB_NAME "MTDRDB$(state_get RESERVATION_ID)"
+    if ! state_done MTDR_DB_NAME; then
+      if test -n "$EXISTING_DB_NAME"; then
+        state_set MTDR_DB_NAME "$EXISTING_DB_NAME"
+      else
+        echo "ERROR: EXISTING_DB_NAME must be set for an existing database."
+        exit
+      fi
+    fi
     #state_set_done OKE_LIMIT_CHECK
     #state_set_done ATP_LIMIT_CHECK
   else
@@ -86,7 +93,14 @@ while ! state_done RUN_NAME; do
   # Validate run name.  Must be between 1 and 13 characters, only letters or numbers, starting with letter
   if [[ "$DN" =~ ^[a-zA-Z][a-zA-Z0-9]{0,12}$ ]]; then
     state_set RUN_NAME `echo "$DN" | awk '{print tolower($0)}'`
-    state_set MTDR_DB_NAME "$(state_get RUN_NAME)$(state_get MTDR_KEY)"
+    if ! state_done MTDR_DB_NAME; then
+      if test -n "$EXISTING_DB_NAME"; then
+        state_set MTDR_DB_NAME "$EXISTING_DB_NAME"
+      else
+        echo "ERROR: EXISTING_DB_NAME must be set for an existing database."
+        exit
+      fi
+    fi
   else
     echo "Error: Invalid directory name $RN.  The directory name must be between 1 and 13 characters,"
     echo "containing only letters or numbers, starting with a letter.  Please restart the workshop with a valid directory name."
@@ -291,6 +305,9 @@ fi
 
 
 # Get MTDR_DB OCID
+if ! state_done MTDR_DB_OCID && test -n "$EXISTING_DB_OCID"; then
+  state_set MTDR_DB_OCID "$EXISTING_DB_OCID"
+fi
 if state_done MTDR_DB_OCID; then
   if ! oci db autonomous-database get --autonomous-database-id "$(state_get MTDR_DB_OCID)" >/dev/null 2>&1; then
     echo "WARNING: Existing MTDR_DB_OCID in state is not accessible. Resetting to rediscover DB OCID."

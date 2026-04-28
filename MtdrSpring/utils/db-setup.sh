@@ -5,56 +5,62 @@
 # Fail on error
 set -e
 
-
-# Create Object Store Bucket (Should be replaced by terraform one day)
-while ! state_done OBJECT_STORE_BUCKET; do
-  echo "Checking object storage bucket"
-#  oci os bucket create --compartment-id "$(state_get COMPARTMENT_OCID)" --name "$(state_get RUN_NAME)"
-  if oci os bucket get --name "$(state_get RUN_NAME)-$(state_get MTDR_KEY)"; then
-    state_set_done OBJECT_STORE_BUCKET
-    echo "finished checking object storage bucket"
+if ! state_done WALLET_GET; then
+  if test -z "$MTDRWORKSHOP_LOCATION"; then
+    echo "ERROR: MTDRWORKSHOP_LOCATION is not set"
+    exit
   fi
-done
+  if ! test -d "$MTDRWORKSHOP_LOCATION/wallet"; then
+    echo "ERROR: wallet folder not found at $MTDRWORKSHOP_LOCATION/wallet"
+    exit
+  fi
+  if ! test -f "$MTDRWORKSHOP_LOCATION/wallet/cwallet.sso"; then
+    echo "ERROR: cwallet.sso not found in wallet folder"
+    exit
+  fi
+  if ! test -f "$MTDRWORKSHOP_LOCATION/wallet/tnsnames.ora"; then
+    echo "ERROR: tnsnames.ora not found in wallet folder"
+    exit
+  fi
+  state_set_done OBJECT_STORE_BUCKET
+  state_set_done WALLET_GET
+  state_set_done CWALLET_SSO_OBJECT
+  state_set_done CWALLET_SSO_AUTH_URL
+fi
+
+if [[ "${USE_EXISTING_WALLET:-0}" == "1" ]]; then
+  if test -z "$EXISTING_WALLET_PATH"; then
+    echo "ERROR: USE_EXISTING_WALLET is set but EXISTING_WALLET_PATH is empty"
+    exit 1
+  fi
+  cd "$MTDRWORKSHOP_LOCATION"
+  mkdir -p wallet
+  if test -f "$EXISTING_WALLET_PATH"; then
+    if test -n "$WALLET_ZIP_PASSWORD"; then
+      unzip -o -P "$WALLET_ZIP_PASSWORD" "$EXISTING_WALLET_PATH" -d "$MTDRWORKSHOP_LOCATION/wallet"
+    else
+      if ! unzip -o "$EXISTING_WALLET_PATH" -d "$MTDRWORKSHOP_LOCATION/wallet"; then
+        echo "ERROR: Wallet zip requires WALLET_ZIP_PASSWORD"
+        exit 1
+      fi
+    fi
+  elif test -d "$EXISTING_WALLET_PATH"; then
+    cp -R "$EXISTING_WALLET_PATH"/. "$MTDRWORKSHOP_LOCATION/wallet/"
+  else
+    echo "ERROR: EXISTING_WALLET_PATH not found"
+    exit 1
+  fi
+  state_set_done OBJECT_STORE_BUCKET
+  state_set_done WALLET_GET
+  state_set_done CWALLET_SSO_OBJECT
+  state_set_done CWALLET_SSO_AUTH_URL
+fi
 
 
 # Wait for Order DB OCID
 while ! state_done MTDR_DB_OCID; do
   echo "`date`: Waiting for MTDR_DB_OCID"
   sleep 2
-done
-
-
-# Get Wallet
-while ! state_done WALLET_GET; do
-  echo "creating wallet"
-  cd $MTDRWORKSHOP_LOCATION
-  mkdir wallet
-  cd wallet
-  oci db autonomous-database generate-wallet --autonomous-database-id "$(state_get MTDR_DB_OCID)" --file 'wallet.zip' --password 'Welcome1' --generate-type 'ALL'
-  unzip wallet.zip
-  cd $MTDRWORKSHOP_LOCATION
-  state_set_done WALLET_GET
-  echo "finished creating wallet"
-done
-
-
-# Get DB Connection Wallet and to Object Store
-while ! state_done CWALLET_SSO_OBJECT; do
-  echo "grabbing wallet"
-  cd $MTDRWORKSHOP_LOCATION/wallet
-  oci os object put --bucket-name "$(state_get RUN_NAME)-$(state_get MTDR_KEY)" --name "cwallet.sso" --file 'cwallet.sso'
-  cd $MTDRWORKSHOP_LOCATION
-  state_set_done CWALLET_SSO_OBJECT
-  echo "done grabbing wallet"
-done
-
-
-# Create Authenticated Link to Wallet
-while ! state_done CWALLET_SSO_AUTH_URL; do
-  echo "creating authenticated link to wallet"
-  ACCESS_URI=`oci os preauth-request create --object-name 'cwallet.sso' --access-type 'ObjectRead' --bucket-name "$(state_get RUN_NAME)-$(state_get MTDR_KEY)" --name 'mtdrworkshop' --time-expires $(date '+%Y-%m-%d' --date '+7 days') --query 'data."access-uri"' --raw-output`
-  state_set CWALLET_SSO_AUTH_URL "https://objectstorage.$(state_get REGION).oraclecloud.com${ACCESS_URI}"
-  echo "done creating authenticated link to wallet"
 done
 
 

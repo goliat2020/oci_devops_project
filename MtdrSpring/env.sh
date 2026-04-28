@@ -58,6 +58,10 @@ mkdir -p $MTDRWORKSHOP_LOG
 
 source $MTDRWORKSHOP_LOCATION/utils/state-functions.sh
 
+# Existing DB configuration (required)
+export EXISTING_DB_NAME="reacttodofpoyo"
+export EXISTING_DB_OCID="ocid1.autonomousdatabase.oc1.mx-queretaro-1.anyxeljrkfxppwya2rkjkp4bklaj5aarjzlhkorl2rws34sdykjfpwenaiaa"
+
 # SHORTCUT ALIASES AND UTILS...
 alias k='kubectl'
 alias kt='kubectl --insecure-skip-tls-verify'

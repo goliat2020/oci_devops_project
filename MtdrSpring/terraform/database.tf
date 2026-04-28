@@ -18,6 +18,7 @@ resource "random_password" "database_admin_password" {
   min_numeric = "1"
 }
 resource "oci_database_autonomous_database" "autonomous_database_atp" {
+  count                    = 0
   #Required
   admin_password           = random_password.database_admin_password.result
   compartment_id           = var.ociCompartmentOcid
