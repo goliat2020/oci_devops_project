@@ -32,6 +32,7 @@ import {
   CardActions,
   Box
 } from '@mui/material';
+import Grow from '@mui/material/Grow';
 import Moment from 'react-moment';
 
 /* In this application we're using Function Components with the State Hooks
@@ -144,18 +145,18 @@ function App() {
     }
     return (
       <div className="App">
-        <AppBar position="static" elevation={1} sx={{ backgroundColor: '#CA0000', color: '#fff' }}>
+        <AppBar position="static" elevation={1} sx={{ background: 'linear-gradient(90deg,#7c3aed,#d94c4c)', color: '#fff' }}>
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
               Oracle Project Admin
             </Typography>
-            <Typography variant="body2" color="textSecondary">Team dashboard</Typography>
+            <Typography variant="body2" color="textSecondary">Panel del equipo</Typography>
           </Toolbar>
         </AppBar>
         <Container className="app-container">
           <Box className="hero">
-            <Typography variant="h4" gutterBottom>My Todo List</Typography>
-            <Typography variant="body2" color="textSecondary">HOLA</Typography>
+            <Typography variant="h4" gutterBottom>Mi Lista de Tareas</Typography>
+            <Typography variant="body2" color="textSecondary">Organiza tu trabajo. Añade, marca como hecho o elimina tareas con facilidad.</Typography>
           </Box>
 
           <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
@@ -173,22 +174,26 @@ function App() {
           )}
 
           <Grid container spacing={2}>
-            {items.map(item => (
+            {items.map((item, idx) => (
               <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <Card className="task-card">
-                  <CardContent>
-                    <Typography className="task-desc">{item.description}</Typography>
-                    <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
-                  </CardContent>
-                  <CardActions>
-                    <div className="task-actions">
-                      <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
-                        {item.done ? <UndoIcon /> : <CheckIcon />}
-                      </IconButton>
-                      <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Delete</Button>
-                    </div>
-                  </CardActions>
-                </Card>
+                <Grow in timeout={300 + (idx * 80)}>
+                  <div>
+                    <Card className={`task-card ${item.done ? 'done' : ''} animate`}>
+                      <CardContent>
+                        <Typography className="task-desc">{item.description}</Typography>
+                        <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
+                      </CardContent>
+                      <CardActions>
+                        <div className="task-actions">
+                          <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
+                            {item.done ? <UndoIcon /> : <CheckIcon />}
+                          </IconButton>
+                          <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Eliminar</Button>
+                        </div>
+                      </CardActions>
+                    </Card>
+                  </div>
+                </Grow>
               </Grid>
             ))}
           </Grid>

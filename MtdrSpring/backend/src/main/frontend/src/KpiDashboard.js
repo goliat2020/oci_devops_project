@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import {
   Typography,
@@ -29,39 +29,7 @@ function KpiDashboard() {
   const [actions, setActions] = useState([]);
 
   useEffect(() => {
-    // If running in mock mode, use hardcoded data so the UI shows values
-    if (process.env.REACT_APP_USE_MOCK === 'true') {
-      const mockTasks = [
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 1, userNombre: 'Alice', value: 12 },
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 2, userNombre: 'Bob', value: 8 },
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 3, userNombre: 'Carlos', value: 5 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 1, userNombre: 'Alice', value: 10 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 2, userNombre: 'Bob', value: 14 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 4, userNombre: 'Diana', value: 9 }
-      ];
-      const mockHours = [
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 1, userNombre: 'Alice', value: 36 },
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 2, userNombre: 'Bob', value: 28 },
-        { sprintId: 1, sprintNombre: 'Sprint 1', userId: 3, userNombre: 'Carlos', value: 40 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 1, userNombre: 'Alice', value: 30 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 2, userNombre: 'Bob', value: 45 },
-        { sprintId: 2, sprintNombre: 'Sprint 2', userId: 4, userNombre: 'Diana', value: 27 }
-      ];
-      setDataTasks(mockTasks);
-      setDataHours(mockHours);
-      const sprintMap = new Map();
-      mockTasks.concat(mockHours).forEach(p => { if (p && p.sprintId != null) sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`); });
-      const sList = Array.from(sprintMap.entries()).map(([id,name]) => ({id,name}));
-      setSprints(sList);
-      if (sList.length>0) setSelectedSprint(sList[0].id);
-      // populate user filter list by extracting unique users
-      const userSet = new Map();
-      mockTasks.concat(mockHours).forEach(p => { if (p && p.userId!=null) userSet.set(p.userId, p.userNombre); });
-      // keep empty=All option and set default empty
-      setSelectedUser('');
-      return;
-    }
-
+    // fetch KPI dashboard data from backend
     axios.get('/kpi/dashboard')
       .then(res => {
         const payload = res.data;
@@ -71,13 +39,11 @@ function KpiDashboard() {
         setDataHours(hours);
         // derive sprints
         const sprintMap = new Map();
-        tasks.concat(hours).forEach(p => {
-          if (p && p.sprintId != null) sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
-        });
+        tasks.concat(hours).forEach(p => { if (p && p.sprintId != null) sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`); });
         const sList = Array.from(sprintMap.entries()).map(([id,name]) => ({id,name}));
         setSprints(sList);
         if (sList.length>0) setSelectedSprint(sList[0].id);
-        // derive user list
+        // derive user list (names are used elsewhere to filter)
         const userMap = new Map();
         tasks.concat(hours).forEach(p => { if (p && p.userId!=null) userMap.set(p.userId, p.userNombre); });
         setSelectedUser('');
@@ -115,7 +81,7 @@ function KpiDashboard() {
   dataTasks.concat(dataHours).forEach(p => { if (p && p.userId!=null) usersMap.set(p.userNombre, p.userId); });
   const usersList = Array.from(usersMap.keys());
 
-  const chartData = buildChartData(selectedSprint, selectedUser);
+  const chartData = useMemo(() => buildChartData(selectedSprint, selectedUser), [dataTasks, dataHours, selectedSprint, selectedUser]);
 
   // Metrics
   const totalHours = chartData.reduce((s,x)=> s + (x.hours||0), 0);
