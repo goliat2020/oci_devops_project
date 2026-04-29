@@ -1,6 +1,7 @@
 package com.springboot.MyTodoList.controller;
 import com.springboot.MyTodoList.model.ToDoItem;
 import com.springboot.MyTodoList.service.ToDoItemService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,9 @@ import java.util.List;
 public class ToDoItemController {
     @Autowired
     private ToDoItemService toDoItemService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
     //@CrossOrigin
     @GetMapping(value = "/todolist")
     public List<ToDoItem> getAllToDoItems(){
@@ -40,7 +44,10 @@ public class ToDoItemController {
     }
     //@CrossOrigin
     @PostMapping(value = "/todolist")
-    public ResponseEntity<ToDoItem> addToDoItem(@RequestBody ToDoItem todoItem) throws Exception{
+    public ResponseEntity<ToDoItem> addToDoItem(@RequestBody String rawBody) throws Exception{
+        // Workaround: some environments are failing to bind @RequestBody ToDoItem and return 415.
+        // Parse JSON manually to restore POST support.
+        ToDoItem todoItem = objectMapper.readValue(rawBody, ToDoItem.class);
         ToDoItem td = toDoItemService.addToDoItem(todoItem);
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.set("location",""+td.getID());
@@ -52,8 +59,8 @@ public class ToDoItemController {
     }
 
     @PostMapping(value = "/tasks")
-    public ResponseEntity<ToDoItem> addTask(@RequestBody ToDoItem todoItem) throws Exception{
-        return addToDoItem(todoItem);
+    public ResponseEntity<ToDoItem> addTask(@RequestBody String rawBody) throws Exception{
+        return addToDoItem(rawBody);
     }
     //@CrossOrigin
     @PutMapping(value = "todolist/{id}")

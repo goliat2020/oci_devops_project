@@ -28,6 +28,27 @@ const mockData = [
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const mockGeneratePlan = async (payload) => {
+	await sleep(250);
+	const topic = (payload && payload.prompt ? payload.prompt : 'Proyecto').trim();
+	const words = topic.split(/\s+/).filter(Boolean);
+	const count = Number(payload && payload.taskCount ? payload.taskCount : 6) || 6;
+	return Array.from({ length: count }, (_, index) => {
+		const label = words[index % words.length] || 'Proyecto';
+		return {
+			titulo: `${label} - tarea ${index + 1}`,
+			descripcion: `Desglosar ${topic.toLowerCase()} en el paso ${index + 1}.`,
+			prioridad: index === 0 ? 'HIGH' : 'MEDIUM',
+			estimacionHoras: index === 0 ? 4 : 2,
+			horasReales: 0,
+			idUsuario: payload && payload.defaultUserId != null ? payload.defaultUserId : 1,
+			idSprint: payload && payload.defaultSprintId != null ? payload.defaultSprintId : 1,
+			idEstado: 1,
+			idProyecto: payload && payload.defaultProjectId != null ? payload.defaultProjectId : null
+		};
+	});
+};
+
 const API = {
 	list: async () => {
 		if (useMock) {
@@ -78,7 +99,16 @@ const API = {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(data)
 		});
-		if (!res.ok) throw new Error('Network error');
+		if (!res.ok) {
+			let message = 'Network error';
+			try {
+				const text = await res.text();
+				if (text) message = text;
+			} catch (err) {
+				// ignore
+			}
+			throw new Error(message);
+		}
 		// real backend doesn't return the created item; return response for compatibility
 		return res;
 	},
@@ -109,6 +139,27 @@ const API = {
 		const res = await fetch(`${REAL_BASE}/${id}`, { method: 'DELETE' });
 		if (!res.ok) throw new Error('Network error');
 		return res;
+	},
+	generatePlan: async (payload) => {
+		if (useMock) {
+			return mockGeneratePlan(payload);
+		}
+		const res = await fetch('/ai/generate-plan', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		if (!res.ok) {
+			let message = 'Network error';
+			try {
+				const body = await res.json();
+				message = body.message || body.detail || body.error || message;
+			} catch (err) {
+				message = await res.text();
+			}
+			throw new Error(message);
+		}
+		return res.json();
 	}
 };
 

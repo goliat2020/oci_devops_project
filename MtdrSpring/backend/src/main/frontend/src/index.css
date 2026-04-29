@@ -11,6 +11,7 @@
   --muted: #6B7280;
   --primary: #2563EB; /* nice blue */
   --accent: #06B6D4;
+  --hero: linear-gradient(135deg, rgba(202,0,0,0.12), rgba(37,99,235,0.08));
 }
 body{
   background-color: var(--bg);
@@ -32,6 +33,10 @@ body{
 }
 .hero{
   margin-bottom: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 18px;
+  background: var(--hero);
+  border: 1px solid rgba(202,0,0,0.08);
 }
 .stats{
   display:flex;
@@ -43,6 +48,17 @@ body{
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(16,24,40,0.06);
   padding: 0.75rem;
+}
+.ai-panel{
+  background: rgba(255,255,255,0.92);
+}
+.ai-hero{
+  display:flex;
+  flex-direction:column;
+  gap:0.25rem;
+}
+.ai-task-card{
+  height: 100%;
 }
 .task-desc{
   font-size: 1rem;

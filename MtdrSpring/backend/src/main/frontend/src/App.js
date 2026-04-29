@@ -14,6 +14,7 @@ import React, { useState, useEffect } from 'react';
 import NewItem from './NewItem';
 import API from './API';
 import KpiDashboard from './KpiDashboard';
+import AiPlanner from './AiPlanner';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
@@ -30,7 +31,8 @@ import {
   Card,
   CardContent,
   CardActions,
-  Box
+  Box,
+  Stack
 } from '@mui/material';
 import Moment from 'react-moment';
 
@@ -41,6 +43,7 @@ import Moment from 'react-moment';
  * one with the items that are already done.
  */
 function App() {
+  const [viewMode, setViewMode] = useState('tasks');
     // isLoading is true while waiting for the backend to return the list
     // of items. We use this state to display a spinning circle:
     const [isLoading, setLoading] = useState(false);
@@ -130,11 +133,11 @@ function App() {
           let newItem;
           if (result && result.headers && typeof result.headers.get === 'function') {
             const id = result.headers.get('location');
-            newItem = { id: id, description: displayDescription };
+            newItem = { id: id, ...data, description: displayDescription };
           } else if (result && result.id) {
             newItem = result;
           } else {
-            newItem = { id: String(Date.now()), description: displayDescription };
+            newItem = { id: String(Date.now()), ...data, description: displayDescription };
           }
           setItems([newItem, ...items]);
           setInserting(false);
@@ -149,52 +152,65 @@ function App() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
               Oracle Project Admin
             </Typography>
-            <Typography variant="body2" color="textSecondary">Team dashboard</Typography>
+            <Stack direction="row" spacing={1}>
+              <Button color="inherit" variant={viewMode === 'tasks' ? 'outlined' : 'text'} onClick={() => setViewMode('tasks')}>
+                Tablero
+              </Button>
+              <Button color="inherit" variant={viewMode === 'ai' ? 'outlined' : 'text'} onClick={() => setViewMode('ai')}>
+                IA
+              </Button>
+            </Stack>
           </Toolbar>
         </AppBar>
         <Container className="app-container">
-          <Box className="hero">
-            <Typography variant="h4" gutterBottom>My Todo List</Typography>
-            <Typography variant="body2" color="textSecondary">HOLA</Typography>
-          </Box>
+          {viewMode === 'tasks' ? (
+            <>
+              <Box className="hero">
+                <Typography variant="h4" gutterBottom>My Todo List</Typography>
+                <Typography variant="body2" color="textSecondary">HOLA</Typography>
+              </Box>
 
-          <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
-            <NewItem addItem={addItem} isInserting={isInserting} />
-          </Paper>
+              <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
+                <NewItem addItem={addItem} isInserting={isInserting} />
+              </Paper>
 
-          { error && <Typography color="error">Error: {error.message}</Typography> }
+              { error && <Typography color="error">Error: {error.message}</Typography> }
 
-          { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
+              { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
 
-          { !isLoading && items.length === 0 && (
-            <Paper className="task-card empty-state">
-              <Typography>No tasks yet. Add your first task above.</Typography>
-            </Paper>
-          )}
+              { !isLoading && items.length === 0 && (
+                <Paper className="task-card empty-state">
+                  <Typography>No tasks yet. Add your first task above.</Typography>
+                </Paper>
+              )}
 
-          <Grid container spacing={2}>
-            {items.map(item => (
-              <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <Card className="task-card">
-                  <CardContent>
-                    <Typography className="task-desc">{item.description}</Typography>
-                    <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
-                  </CardContent>
-                  <CardActions>
-                    <div className="task-actions">
-                      <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
-                        {item.done ? <UndoIcon /> : <CheckIcon />}
-                      </IconButton>
-                      <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Delete</Button>
-                    </div>
-                  </CardActions>
-                </Card>
+              <Grid container spacing={2}>
+                {items.map(item => (
+                  <Grid item xs={12} sm={6} md={4} key={item.id}>
+                    <Card className="task-card">
+                      <CardContent>
+                        <Typography className="task-desc">{item.description}</Typography>
+                        <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
+                      </CardContent>
+                      <CardActions>
+                        <div className="task-actions">
+                          <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
+                            {item.done ? <UndoIcon /> : <CheckIcon />}
+                          </IconButton>
+                          <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Delete</Button>
+                        </div>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
 
-          {/* KPI Dashboard for Tasks / Hours */}
-          <KpiDashboard />
+              {/* KPI Dashboard for Tasks / Hours */}
+              <KpiDashboard />
+            </>
+          ) : (
+            <AiPlanner onAddTask={addItem} onBack={() => setViewMode('tasks')} />
+          )}
 
         </Container>
       </div>
