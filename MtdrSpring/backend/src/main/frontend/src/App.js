@@ -17,6 +17,10 @@ import KpiDashboard from './KpiDashboard';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   AppBar,
   Toolbar,
@@ -34,6 +38,7 @@ import {
 } from '@mui/material';
 import Grow from '@mui/material/Grow';
 import Moment from 'react-moment';
+import TaskAI from './TaskAI';
 
 /* In this application we're using Function Components with the State Hooks
  * to manage the states. See the doc: https://reactjs.org/docs/hooks-state.html
@@ -53,6 +58,9 @@ function App() {
     const [items, setItems] = useState([]);
     // In case of an error during the API call:
     const [error, setError] = useState();
+
+    const [view, setView] = useState('home'); // navigation
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     function deleteItem(deleteId) {
       API.remove(deleteId).then(
@@ -143,66 +151,117 @@ function App() {
         (error) => { setInserting(false); setError(error); }
       );
     }
-    return (
-      <div className="App">
-        <AppBar position="static" elevation={1} sx={{ background: 'linear-gradient(90deg,#7c3aed,#d94c4c)', color: '#fff' }}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
-              Oracle Project Admin
-            </Typography>
-            <Typography variant="body2" color="textSecondary">Panel del equipo</Typography>
-          </Toolbar>
-        </AppBar>
-        <Container className="app-container">
-          <Box className="hero">
-            <Typography variant="h4" gutterBottom>Mi Lista de Tareas</Typography>
-            <Typography variant="body2" color="textSecondary">Organiza tu trabajo. Añade, marca como hecho o elimina tareas con facilidad.</Typography>
-          </Box>
 
-          <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
-            <NewItem addItem={addItem} isInserting={isInserting} />
-          </Paper>
+    useEffect(() => {
+    const onResize = () => {
+      // por defecto colapsada en pantallas pequeñas
+      setSidebarCollapsed(window.innerWidth < 900);
+    };
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-          { error && <Typography color="error">Error: {error.message}</Typography> }
+  return (
+    <div className="App">
+      <AppBar position="fixed" elevation={1} className="appbar">
+        <Toolbar>
+          <Typography
+            variant="h6"
+            component="div"
+            className="appbar-title"
+            sx={{ flexGrow: 1, fontWeight: 800, fontSize: '1.5rem', color: '#fff' }}
+          >
+            Oracle Project Admin
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+            Panel del equipo
+          </Typography>
+        </Toolbar>
+      </AppBar>
 
-          { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
+      <div className={`layout ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <nav className="sidebar" aria-label="main navigation">
+          <div className="sidebar-top">
+            <div className="sidebar-header">Oracle Project</div>
+            <IconButton size="small" className="sidebar-toggle" onClick={() => setSidebarCollapsed(s => !s)} aria-label="toggle sidebar">
+              {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </IconButton>
+          </div>
 
-          { !isLoading && items.length === 0 && (
-            <Paper className="task-card empty-state">
-              <Typography>No tasks yet. Add your first task above.</Typography>
-            </Paper>
-          )}
+          <ul className="nav-list">
+            <li className={`nav-item ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')}>
+              <HomeOutlinedIcon className="nav-icon" />
+              {!sidebarCollapsed && <span className="nav-label">Home</span>}
+            </li>
+            <li className={`nav-item ${view === 'taskai' ? 'active' : ''}`} onClick={() => setView('taskai')}>
+              <LightbulbOutlinedIcon className="nav-icon" />
+              {!sidebarCollapsed && <span className="nav-label">Task AI</span>}
+            </li>
+          </ul>
+        </nav>
 
-          <Grid container spacing={2}>
-            {items.map((item, idx) => (
-              <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <Grow in timeout={300 + (idx * 80)}>
-                  <div>
-                    <Card className={`task-card ${item.done ? 'done' : ''} animate`}>
-                      <CardContent>
-                        <Typography className="task-desc">{item.description}</Typography>
-                        <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
-                      </CardContent>
-                      <CardActions>
-                        <div className="task-actions">
-                          <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
-                            {item.done ? <UndoIcon /> : <CheckIcon />}
-                          </IconButton>
-                          <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Eliminar</Button>
+        <main className="main-content">
+          <Container className="app-container">
+            {view === 'home' ? (
+              <>
+                <Box className="hero" sx={{ mb: 2 }}>
+                  <Typography variant="h4" gutterBottom>Mi Lista de Tareas</Typography>
+                  <Typography variant="body2" color="textSecondary">Organiza tu trabajo. Añade, marca como hecho o elimina tareas con facilidad.</Typography>
+                </Box>
+
+                <Paper variant="outlined" className="task-card" sx={{ p: 2, mb: 2 }}>
+                  <NewItem addItem={addItem} isInserting={isInserting} />
+                </Paper>
+
+                { error && <Typography color="error" sx={{ mb: 2 }}>Error: {error.message || String(error)}</Typography> }
+
+                { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
+
+                { !isLoading && items.length === 0 && (
+                  <Paper className="task-card empty-state" sx={{ mb: 2 }}>
+                    <Typography>No tasks yet. Add your first task above.</Typography>
+                  </Paper>
+                )}
+
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  {items.map((item, idx) => (
+                    <Grid item xs={12} sm={6} md={4} key={item.id}>
+                      <Grow in timeout={300 + (idx * 80)}>
+                        <div>
+                          <Card className={`task-card ${item.done ? 'done' : ''} animate`}>
+                            <CardContent>
+                              <Typography className="task-desc">{item.description}</Typography>
+                              {item.createdAt && (
+                                <Typography className="task-meta">
+                                  <Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment>
+                                </Typography>
+                              )}
+                            </CardContent>
+                            <CardActions>
+                              <div className="task-actions">
+                                <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
+                                  {item.done ? <UndoIcon /> : <CheckIcon />}
+                                </IconButton>
+                                <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Eliminar</Button>
+                              </div>
+                            </CardActions>
+                          </Card>
                         </div>
-                      </CardActions>
-                    </Card>
-                  </div>
-                </Grow>
-              </Grid>
-            ))}
-          </Grid>
+                      </Grow>
+                    </Grid>
+                  ))}
+                </Grid>
 
-          {/* KPI Dashboard for Tasks / Hours */}
-          <KpiDashboard />
-
-        </Container>
+                <KpiDashboard />
+              </>
+            ) : (
+              <TaskAI />
+            )}
+          </Container>
+        </main>
       </div>
-    );
+    </div>
+  );
 }
 export default App;

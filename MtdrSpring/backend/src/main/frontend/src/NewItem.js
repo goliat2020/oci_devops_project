@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { TextField, InputAdornment, IconButton, Grid, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { TextField, InputAdornment, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import API from './API';
 
@@ -173,12 +173,16 @@ function NewItem(props) {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={3}>
-            <InputAdornment position="end">
-              <IconButton aria-label="add" color="primary" type="submit" className="add-button" disabled={props.isInserting}>
-                <AddIcon />
-              </IconButton>
-            </InputAdornment>
+          <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              className="add-button"
+              startIcon={<AddIcon />}
+              disabled={props.isInserting}
+            >
+              Agregar Tarea
+            </Button>
           </Grid>
         </Grid>
       </form>

@@ -9,7 +9,7 @@
   --bg-2: #ffffff; /* gradient end */
   --panel: #ffffff;
   --card: #ffffff;
-  --muted: #6b7280;
+  --muted: #a5abb6;
   --text: #0f1724;
   --primary: #2563eb; /* blue accent for actions */
   --accent: #ef4444; /* red accent used subtly */
@@ -23,7 +23,7 @@ body{
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: radial-gradient(800px 360px at 10% 8%, rgba(239,68,68,0.02), transparent), linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  background: #f7fafc;
   color: var(--text);
 }
 
@@ -42,14 +42,14 @@ body{
 
 /* Header / AppBar - keep reddish gradient */
 .appbar{
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
-  background: linear-gradient(90deg, rgba(239,68,68,0.95), rgba(249,115,22,0.95));
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(90deg, rgba(241, 31, 31, 1), rgb(243, 70, 50));
   color: #fff;
   box-shadow: 0 8px 30px rgba(239,68,68,0.08);
 }
-.appbar-title{ font-weight:800; letter-spacing:0.4px; color: #fff; }
+.appbar-title{ font-weight:800; font-size: 1.5rem; letter-spacing:0.4px; color: #fff; }
 
 /* Hero */
 .hero{
@@ -95,13 +95,57 @@ body{
 /* Buttons */
 .add-button{
   transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
-  background: linear-gradient(90deg,var(--primary), #60a5fa);
+  background: linear-gradient(90deg,rgba(241, 31, 31, 1), rgb(243, 70, 50));
   color: #fff;
   border-radius: 10px;
-  padding: 8px;
+  padding: 10px 16px;
+  min-height: 40px;
+  text-transform: none;
+  font-weight: 700;
   box-shadow: 0 6px 18px rgba(37,99,235,0.12);
 }
-.add-button:hover{ transform: translateY(-3px); box-shadow: 0 10px 30px rgba(37,99,235,0.14); }
+.add-button:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.14);
+}
+
+.layout{ display:flex; gap:1rem; align-items:flex-start; }
+.sidebar{
+  width:220px;
+  background: linear-gradient(180deg, #fff6f6, #ffeaea);
+  border-radius: 10px;
+  padding: 0.75rem;
+  box-shadow: 0 6px 18px rgba(15,23,36,0.03);
+  border: 1px solid rgba(15,23,36,0.03);
+  flex-shrink:0;
+}
+.sidebar-header{ font-weight:700; margin-bottom:0.5rem; color:#b32222; }
+.nav-list{ list-style:none; padding:0; margin:0; }
+.nav-item{
+  padding:0.6rem 0.5rem;
+  border-radius:8px;
+  cursor:pointer;
+  color:#7b2b2b;
+  display:flex;
+  align-items:center;
+  gap:0.5rem;
+  transition: background-color 160ms ease, transform 120ms ease;
+  margin-bottom:0.35rem;
+}
+.nav-item:hover{ background: rgba(243,70,50,0.06); transform: translateX(4px); }
+.nav-item.active{ background: linear-gradient(90deg, rgba(241,31,31,0.12), rgba(243,70,50,0.08)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); color:#b32222; font-weight:700; }
+.nav-emoji{ font-size:1.05rem; }
+
+/* main content grows */
+.main-content{ flex:1; }
+
+/* responsive: collapse sidebar above small screens */
+@media (max-width:900px){
+  .layout{ flex-direction:column; }
+  .sidebar{ width:100%; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; }
+  .nav-list{ display:flex; gap:0.5rem; }
+  .nav-item{ padding:0.5rem 0.6rem; }
+}
 
 /* subtle entry animation */
 @keyframes cardFadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
@@ -115,4 +159,91 @@ body{
 @media (max-width:900px){
   .app-container{ padding:0.75rem; margin:1.25rem auto; }
   .task-actions{ flex-wrap:wrap }
+}
+
+.appbar{
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  padding: 0 1rem;
+  background: linear-gradient(90deg, rgba(241, 31, 31, 1), rgb(243, 70, 50));
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  border-radius: 0; /* sin redondeos */
+  z-index: 1200;
+}
+
+/* reserva espacio bajo el header */
+body { padding-top: 64px; }
+
+/* Sidebar minimalista fijo, blanco y full-height debajo del header */
+.sidebar{
+  position: fixed;
+  top: 64px;
+  left: 0;
+  width: 220px;
+  height: calc(100vh - 64px);
+  background: #ffffff;
+  border-radius: 0;
+  padding: 12px;
+  box-shadow: none;
+  border-right: 1px solid rgba(15,23,36,0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  transition: width 200ms ease;
+  z-index: 1100;
+}
+.layout.collapsed .sidebar{ width: 64px; }
+
+/* top row (title + toggle) */
+.sidebar-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:6px; }
+.sidebar-header{ font-weight:700; color:#222; font-size:0.95rem; display:inline-block; margin:0; }
+.sidebar-toggle{ color: rgba(0,0,0,0.6); }
+
+/* nav items: minimalistas */
+.nav-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
+.nav-item{
+  height:44px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:6px 10px;
+  cursor:pointer;
+  color: #333;
+  border-radius: 0; /* sin redondeos */
+  transition: background-color 140ms ease, color 140ms ease, transform 120ms ease;
+}
+.nav-item .nav-icon{ color: rgba(0,0,0,0.65); font-size:20px; }
+.nav-item .nav-label{ font-weight:600; color:#333; }
+
+/* cuando está activo, gris tenue */
+.nav-item.active{
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+/* comportamiento en estado colapsado: centrar iconos y ocultar labels */
+.layout.collapsed .nav-item{ justify-content:center; padding:6px 0; }
+.layout.collapsed .nav-label{ display:none; }
+.layout.collapsed .sidebar-header{ display:none; }
+
+/* el main-content debe reservar espacio a la izquierda según sidebar */
+.main-content{
+  margin-left: 220px;
+  transition: margin-left 200ms ease, width 200ms ease;
+  min-height: calc(100vh - 64px);
+  padding-bottom: 3rem;
+}
+.layout.collapsed .main-content{ margin-left: 64px; }
+
+/* responsive: por defecto colapsada en pantallas pequeñas */
+@media (max-width:900px){
+  .layout{ /* for safety */ }
+  .sidebar{ width: 64px; }
+  .layout.collapsed .sidebar{ width: 64px; }
+  .main-content{ margin-left:64px; }
 }
