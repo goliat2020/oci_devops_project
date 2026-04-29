@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -8,8 +8,12 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControl,
   Grid,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   Typography
@@ -40,18 +44,93 @@ const toCreatePayload = (task, defaults = {}) => ({
 function AiPlanner(props) {
   const [prompt, setPrompt] = useState('Construye un panel para gestionar reservas de un laboratorio, con autenticación, calendario, recordatorios y reportes.');
   const [taskCount, setTaskCount] = useState(6);
-  const [defaultUserId, setDefaultUserId] = useState('1');
-  const [defaultSprintId, setDefaultSprintId] = useState('1');
-  const [defaultProjectId, setDefaultProjectId] = useState('');
+  const [defaultUserId, setDefaultUserId] = useState('');
+  const [defaultSprintId, setDefaultSprintId] = useState('');
+  const [users, setUsers] = useState([]);
+  const [sprints, setSprints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [tasks, setTasks] = useState([]);
+  const DEFAULT_PROJECT_ID = 1;
 
   const defaults = useMemo(() => ({
     defaultUserId: normalizeNumber(defaultUserId, null),
     defaultSprintId: normalizeNumber(defaultSprintId, null),
-    defaultProjectId: normalizeNumber(defaultProjectId, null)
-  }), [defaultUserId, defaultSprintId, defaultProjectId]);
+    defaultProjectId: DEFAULT_PROJECT_ID
+  }), [defaultUserId, defaultSprintId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchCatalogs = async () => {
+      try {
+        const dashboardResponse = await fetch('/kpi/dashboard');
+        if (dashboardResponse.ok) {
+          const dashboard = await dashboardResponse.json();
+          const userMap = new Map();
+          const sprintMap = new Map();
+
+          const processPoint = (point) => {
+            if (point && point.userId != null) {
+              userMap.set(point.userId, point.userNombre || `Usuario ${point.userId}`);
+            }
+            if (point && (point.sprintId != null || point.sprintId === 0)) {
+              sprintMap.set(point.sprintId, point.sprintNombre || `Sprint ${point.sprintId}`);
+            }
+          };
+
+          (dashboard.tasksCompletedByUserSprint || []).forEach(processPoint);
+          (dashboard.realHoursByUserSprint || []).forEach(processPoint);
+
+          if (mounted) {
+            const usersList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
+            const sprintsList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
+            setUsers(usersList);
+            setSprints(sprintsList);
+            if (usersList.length > 0 && !defaultUserId) {
+              setDefaultUserId(String(usersList[0].id));
+            }
+            if (sprintsList.length > 0 && !defaultSprintId) {
+              setDefaultSprintId(String(sprintsList[0].id));
+            }
+          }
+        }
+      } catch (catalogError) {
+        console.error('Failed fetching KPI dashboard for AI planner', catalogError);
+      }
+    };
+
+    fetchCatalogs();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const resolveUserName = (value) => {
+    const numericValue = normalizeNumber(value, null);
+    if (numericValue == null) {
+      return 'Sin definir';
+    }
+    const match = users.find((user) => String(user.id) === String(numericValue));
+    return match ? match.name : `Usuario ${numericValue}`;
+  };
+
+  const resolveSprintName = (value) => {
+    const numericValue = normalizeNumber(value, null);
+    if (numericValue == null) {
+      return 'Sin definir';
+    }
+    const match = sprints.find((sprint) => String(sprint.id) === String(numericValue));
+    return match ? match.name : `Sprint ${numericValue}`;
+  };
+
+  const resolveProjectName = (value) => {
+    return 'Proyecto principal';
+  };
+
+  const selectedUserLabel = resolveUserName(defaultUserId);
+  const selectedSprintLabel = resolveSprintName(defaultSprintId);
+  const selectedProjectLabel = 'Proyecto principal';
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -128,32 +207,47 @@ function AiPlanner(props) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="ID Usuario por defecto"
-              type="number"
-              value={defaultUserId}
-              onChange={(e) => setDefaultUserId(e.target.value)}
-              fullWidth
-            />
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel>Usuario por defecto</InputLabel>
+              <Select
+                value={defaultUserId}
+                label="Usuario por defecto"
+                onChange={(e) => setDefaultUserId(e.target.value)}
+              >
+                {users.length > 0 ? users.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>{user.name}</MenuItem>
+                )) : (
+                  <MenuItem value="1">Usuario 1</MenuItem>
+                )}
+              </Select>
+            </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="ID Sprint por defecto"
-              type="number"
-              value={defaultSprintId}
-              onChange={(e) => setDefaultSprintId(e.target.value)}
-              fullWidth
-            />
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel>Sprint por defecto</InputLabel>
+              <Select
+                value={defaultSprintId}
+                label="Sprint por defecto"
+                onChange={(e) => setDefaultSprintId(e.target.value)}
+              >
+                {sprints.length > 0 ? sprints.map((sprint) => (
+                  <MenuItem key={sprint.id} value={sprint.id}>{sprint.name}</MenuItem>
+                )) : (
+                  <MenuItem value="1">Sprint 1</MenuItem>
+                )}
+              </Select>
+            </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="ID Proyecto"
-              type="number"
-              value={defaultProjectId}
-              onChange={(e) => setDefaultProjectId(e.target.value)}
-              fullWidth
-            />
+          <Grid item xs={12} md={4}>
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', border: '1px solid #ddd', p: 2, borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                Proyecto
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                {selectedProjectLabel}
+              </Typography>
+            </Box>
           </Grid>
           <Grid item xs={12}>
             <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -176,6 +270,9 @@ function AiPlanner(props) {
           <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
             <Chip label={`${tasks.length} tareas generadas`} color="primary" variant="outlined" />
             <Chip label="Campos listos para la BD" color="success" variant="outlined" />
+            <Chip label={`Usuario: ${selectedUserLabel}`} variant="outlined" />
+            <Chip label={`Sprint: ${selectedSprintLabel}`} variant="outlined" />
+            <Chip label={`Proyecto: ${selectedProjectLabel}`} variant="outlined" />
           </Stack>
 
           <Grid container spacing={2}>
@@ -192,7 +289,7 @@ function AiPlanner(props) {
                       {task.descripcion || task.titulo}
                     </Typography>
                     <Typography className="task-meta" sx={{ mt: 1 }}>
-                      Usuario: {normalizeNumber(task.idUsuario, defaults.defaultUserId) ?? 'sin definir'} | Sprint: {normalizeNumber(task.idSprint, defaults.defaultSprintId) ?? 'sin definir'}
+                      Usuario: {resolveUserName(task.idUsuario ?? task.userId ?? task.userNombre)} | Sprint: {resolveSprintName(task.idSprint ?? task.sprintId ?? task.sprintNombre)} | Proyecto: {resolveProjectName(task.idProyecto)}
                     </Typography>
                   </CardContent>
                   <CardActions>

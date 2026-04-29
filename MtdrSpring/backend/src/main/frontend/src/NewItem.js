@@ -111,8 +111,8 @@ function NewItem(props) {
       prioridad,
       estimacionHoras: estimacionHoras === '' ? null : Number(estimacionHoras),
       horasReales: horasReales === '' ? null : Number(horasReales),
-      idUsuario: idUsuario === '' ? null : idUsuario,
-      idSprint: idSprint === '' ? null : idSprint
+      idUsuario: idUsuario === '' ? null : Number(idUsuario),
+      idSprint: idSprint === '' ? null : Number(idSprint)
     };
 
     try {

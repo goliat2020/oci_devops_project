@@ -13,8 +13,6 @@ import java.time.OffsetDateTime;
 @Table(name = "TAREA")
 public class ToDoItem {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq_tarea")
-    @SequenceGenerator(name = "seq_tarea", sequenceName = "SEQ_TAREA", allocationSize = 1)
     @Column(name = "ID_TAREA")
     private Integer ID;
 

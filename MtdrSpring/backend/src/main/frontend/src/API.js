@@ -39,7 +39,7 @@ const mockGeneratePlan = async (payload) => {
 			idUsuario: payload && payload.defaultUserId != null ? payload.defaultUserId : 1,
 			idSprint: payload && payload.defaultSprintId != null ? payload.defaultSprintId : 1,
 			idEstado: 1,
-			idProyecto: payload && payload.defaultProjectId != null ? payload.defaultProjectId : null
+				idProyecto: payload && payload.defaultProjectId != null ? payload.defaultProjectId : 1
 		};
 	});
 };
