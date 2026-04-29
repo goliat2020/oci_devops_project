@@ -372,3 +372,19 @@ SQL
 done
 # DB Setup Done
 state_set_done DB_SETUP
+
+# Create sequence for TAREA if it doesn't exist (idempotent)
+cat > create_seq_tarea.sql <<'SQL'
+DECLARE
+  cnt INTEGER := 0;
+BEGIN
+  SELECT COUNT(*) INTO cnt FROM USER_SEQUENCES WHERE SEQUENCE_NAME = 'SEQ_TAREA';
+  IF cnt = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE SEQ_TAREA START WITH 100 INCREMENT BY 1 NOCACHE NOCYCLE';
+  END IF;
+END;
+/
+SQL
+
+sqlplus -s ${DB_USER}/${DB_PASSWORD}@${DB_CONN} @create_seq_tarea.sql
+rm -f create_seq_tarea.sql

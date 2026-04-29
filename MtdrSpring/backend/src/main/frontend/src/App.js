@@ -1,4 +1,4 @@
-          /*
+/*
 ## MyToDoReact version 1.0.
 ##
 ## Copyright (c) 2022 Oracle, Inc.
@@ -10,7 +10,7 @@
  * consistency.
  * @author  jean.de.lavarene@oracle.com
  */
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import NewItem from './NewItem';
 import API from './API';
 import KpiDashboard from './KpiDashboard';
@@ -34,6 +34,7 @@ import {
   Box,
   Stack
 } from '@mui/material';
+import Grow from '@mui/material/Grow';
 import Moment from 'react-moment';
 
 /* In this application we're using Function Components with the State Hooks
@@ -44,176 +45,193 @@ import Moment from 'react-moment';
  */
 function App() {
   const [viewMode, setViewMode] = useState('tasks');
-    // isLoading is true while waiting for the backend to return the list
-    // of items. We use this state to display a spinning circle:
-    const [isLoading, setLoading] = useState(false);
-    // Similar to isLoading, isInserting is true while waiting for the backend
-    // to insert a new item:
-    const [isInserting, setInserting] = useState(false);
-    // The list of todo items is stored in this state. It includes the "done"
-    // "not-done" items:
-    const [items, setItems] = useState([]);
-    // In case of an error during the API call:
-    const [error, setError] = useState();
+  const [isLoading, setLoading] = useState(false);
+  const [isInserting, setInserting] = useState(false);
+  const [items, setItems] = useState([]);
+  const [error, setError] = useState();
 
-    function deleteItem(deleteId) {
-      API.remove(deleteId).then(
-        () => {
-          const remainingItems = items.filter(item => item.id !== deleteId);
-          setItems(remainingItems);
-        },
-        (error) => { setError(error); }
-      );
-    }
-    function toggleDone(event, id, description, done) {
-      event.preventDefault();
-      modifyItem(id, description, done).then(
-        (result) => { reloadOneIteam(id); },
-        (error) => { setError(error); }
-      );
-    }
-    function reloadOneIteam(id){
-      API.get(id).then(
-        (result) => {
-          const items2 = items.map(
-            x => (x.id === id ? {
-               ...x,
-               'description':result.description,
-               'done': result.done
-              } : x));
-          setItems(items2);
-        },
-        (error) => { setError(error); }
-      );
-    }
-    function modifyItem(id, description, done) {
-      var data = {"description": description, "done": done};
-      return API.update(id, data);
-    }
-    /*
-    To simulate slow network, call sleep before making API calls.
-    const sleep = (milliseconds) => {
-      return new Promise(resolve => setTimeout(resolve, milliseconds))
-    }
-    */
-    useEffect(() => {
-      setLoading(true);
-      // sleep(5000).then(() => {
-      API.list().then(
-        (result) => { setLoading(false); setItems(result); },
-        (error) => { setLoading(false); setError(error); }
-      );
+  const errorMessage = typeof error === 'string' ? error : error?.message;
 
-      //})
-    },
-    // https://en.reactjs.org/docs/faq-ajax.html
-    [] // empty deps array [] means
-       // this useEffect will run once
-       // similar to componentDidMount()
+  function deleteItem(deleteId) {
+    API.remove(deleteId).then(
+      () => {
+        setItems((previousItems) => previousItems.filter((item) => item.id !== deleteId));
+      },
+      (err) => { setError(err); }
     );
-    function addItem(payload){
-      // payload can be a simple string (old UI) or an object with full ToDoItem fields
-      console.log("addItem("+JSON.stringify(payload)+")")
-      setInserting(true);
-      let data;
-      let displayDescription = '';
-      if (typeof payload === 'string') {
-        data = { description: payload };
-        displayDescription = payload;
-      } else if (typeof payload === 'object') {
-        // pass the object as-is (API.create mock handles full shape)
-        data = payload;
-        displayDescription = payload.descripcion || payload.titulo || payload.description || '';
-      } else {
-        data = { description: String(payload) };
-        displayDescription = String(payload);
-      }
-      API.create(data).then(
-        (result) => {
-          let newItem;
-          if (result && result.headers && typeof result.headers.get === 'function') {
-            const id = result.headers.get('location');
-            newItem = { id: id, ...data, description: displayDescription };
-          } else if (result && result.id) {
-            newItem = result;
-          } else {
-            newItem = { id: String(Date.now()), ...data, description: displayDescription };
-          }
-          setItems([newItem, ...items]);
-          setInserting(false);
-        },
-        (error) => { setInserting(false); setError(error); }
-      );
+  }
+
+  function toggleDone(event, id, description, done) {
+    event.preventDefault();
+    modifyItem(id, description, done).then(
+      () => { reloadOneIteam(id); },
+      (err) => { setError(err); }
+    );
+  }
+
+  function reloadOneIteam(id) {
+    API.get(id).then(
+      (result) => {
+        setItems((previousItems) => previousItems.map(
+          (item) => (item.id === id ? {
+            ...item,
+            description: result.description,
+            done: result.done
+          } : item)
+        ));
+      },
+      (err) => { setError(err); }
+    );
+  }
+
+  function modifyItem(id, description, done) {
+    const data = { description, done };
+    return API.update(id, data);
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    API.list().then(
+      (result) => { setLoading(false); setItems(result); },
+      (err) => { setLoading(false); setError(err); }
+    );
+  }, []);
+
+  function addItem(payload) {
+    console.log(`addItem(${JSON.stringify(payload)})`);
+    setInserting(true);
+    let data;
+    let displayDescription = '';
+
+    if (typeof payload === 'string') {
+      data = { description: payload };
+      displayDescription = payload;
+    } else if (typeof payload === 'object') {
+      data = payload;
+      displayDescription = payload.descripcion || payload.titulo || payload.description || '';
+    } else {
+      data = { description: String(payload) };
+      displayDescription = String(payload);
     }
-    return (
-      <div className="App">
-        <AppBar position="static" elevation={1} sx={{ backgroundColor: '#CA0000', color: '#fff' }}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
-              Oracle Project Admin
-            </Typography>
-            <Stack direction="row" spacing={1}>
-              <Button color="inherit" variant={viewMode === 'tasks' ? 'outlined' : 'text'} onClick={() => setViewMode('tasks')}>
-                Tablero
-              </Button>
-              <Button color="inherit" variant={viewMode === 'ai' ? 'outlined' : 'text'} onClick={() => setViewMode('ai')}>
-                IA
-              </Button>
-            </Stack>
-          </Toolbar>
-        </AppBar>
-        <Container className="app-container">
-          {viewMode === 'tasks' ? (
-            <>
-              <Box className="hero">
-                <Typography variant="h4" gutterBottom>My Todo List</Typography>
-                <Typography variant="body2" color="textSecondary">HOLA</Typography>
+
+    API.create(data).then(
+      (result) => {
+        let newItem;
+        if (result && result.headers && typeof result.headers.get === 'function') {
+          const id = result.headers.get('location');
+          newItem = { id, ...data, description: displayDescription };
+        } else if (result && result.id) {
+          newItem = result;
+        } else {
+          newItem = { id: String(Date.now()), ...data, description: displayDescription };
+        }
+        setItems((previousItems) => [newItem, ...previousItems]);
+        setInserting(false);
+      },
+      (err) => { setInserting(false); setError(err); }
+    );
+  }
+
+  return (
+    <div className="App">
+      <AppBar
+        position="static"
+        elevation={1}
+        className="appbar"
+        sx={{ background: 'linear-gradient(90deg,#7c3aed,#d94c4c)', color: '#fff' }}
+      >
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
+            Oracle Project Admin
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              color="inherit"
+              variant={viewMode === 'tasks' ? 'outlined' : 'text'}
+              onClick={() => setViewMode('tasks')}
+            >
+              Tablero
+            </Button>
+            <Button
+              color="inherit"
+              variant={viewMode === 'ai' ? 'outlined' : 'text'}
+              onClick={() => setViewMode('ai')}
+            >
+              IA
+            </Button>
+          </Stack>
+        </Toolbar>
+      </AppBar>
+
+      <Container className="app-container">
+        {viewMode === 'tasks' ? (
+          <>
+            <Box className="hero">
+              <Typography variant="h4" gutterBottom>Mi Lista de Tareas</Typography>
+              <Typography variant="body2" color="textSecondary">
+                Organiza tu trabajo. Añade, marca como hecho o elimina tareas con facilidad.
+              </Typography>
+            </Box>
+
+            <Paper variant="outlined" className="task-card" sx={{ padding: 2, marginBottom: 2 }}>
+              <NewItem addItem={addItem} isInserting={isInserting} />
+            </Paper>
+
+            {errorMessage && <Typography color="error">Error: {errorMessage}</Typography>}
+
+            {isLoading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
               </Box>
+            )}
 
-              <Paper variant="outlined" className="task-card" sx={{padding:2, marginBottom:2}}>
-                <NewItem addItem={addItem} isInserting={isInserting} />
+            {!isLoading && items.length === 0 && (
+              <Paper className="task-card empty-state">
+                <Typography>No tasks yet. Add your first task above.</Typography>
               </Paper>
+            )}
 
-              { error && <Typography color="error">Error: {error.message}</Typography> }
+            <Grid container spacing={2}>
+              {items.map((item, index) => (
+                <Grid item xs={12} sm={6} md={4} key={item.id}>
+                  <Grow in timeout={300 + (index * 80)}>
+                    <div>
+                      <Card className={`task-card ${item.done ? 'done' : ''} animate`}>
+                        <CardContent>
+                          <Typography className="task-desc">{item.description}</Typography>
+                          <Typography className="task-meta">
+                            <Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment>
+                          </Typography>
+                        </CardContent>
+                        <CardActions>
+                          <div className="task-actions">
+                            <IconButton
+                              color="primary"
+                              aria-label="toggle-done"
+                              onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}
+                            >
+                              {item.done ? <UndoIcon /> : <CheckIcon />}
+                            </IconButton>
+                            <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>
+                              Eliminar
+                            </Button>
+                          </div>
+                        </CardActions>
+                      </Card>
+                    </div>
+                  </Grow>
+                </Grid>
+              ))}
+            </Grid>
 
-              { isLoading && <Box sx={{display:'flex', justifyContent:'center', p:4}}><CircularProgress /></Box> }
-
-              { !isLoading && items.length === 0 && (
-                <Paper className="task-card empty-state">
-                  <Typography>No tasks yet. Add your first task above.</Typography>
-                </Paper>
-              )}
-
-              <Grid container spacing={2}>
-                {items.map(item => (
-                  <Grid item xs={12} sm={6} md={4} key={item.id}>
-                    <Card className="task-card">
-                      <CardContent>
-                        <Typography className="task-desc">{item.description}</Typography>
-                        <Typography className="task-meta"><Moment format="MMM Do YYYY, hh:mm">{item.createdAt}</Moment></Typography>
-                      </CardContent>
-                      <CardActions>
-                        <div className="task-actions">
-                          <IconButton color="primary" aria-label="toggle-done" onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}>
-                            {item.done ? <UndoIcon /> : <CheckIcon />}
-                          </IconButton>
-                          <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteItem(item.id)}>Delete</Button>
-                        </div>
-                      </CardActions>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-
-              {/* KPI Dashboard for Tasks / Hours */}
-              <KpiDashboard />
-            </>
-          ) : (
-            <AiPlanner onAddTask={addItem} onBack={() => setViewMode('tasks')} />
-          )}
-
-        </Container>
-      </div>
-    );
+            <KpiDashboard />
+          </>
+        ) : (
+          <AiPlanner onAddTask={addItem} onBack={() => setViewMode('tasks')} />
+        )}
+      </Container>
+    </div>
+  );
 }
+
 export default App;
