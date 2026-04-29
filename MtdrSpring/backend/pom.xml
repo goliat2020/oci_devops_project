@@ -138,7 +138,7 @@
 						<goals>
 							<goal>copy-resources</goal>
 						</goals>
-						<phase>prepare-package</phase>
+						<phase>process-resources</phase>
 						<configuration>
 							<outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
 							<resources>
