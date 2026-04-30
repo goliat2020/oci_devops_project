@@ -178,7 +178,7 @@ function AiPlanner(props) {
   return (
     <Box>
       <Box className="hero ai-hero">
-        <Typography variant="h4" gutterBottom>Modulo IA</Typography>
+        <Typography variant="h4" gutterBottom>Asistente de IA</Typography>
         <Typography variant="body2" color="textSecondary">
           Escribe una tarea grande y Gemini la convierte en tareas pequeñas listas para guardar.
         </Typography>
