@@ -27,86 +27,155 @@ function NewItem(props) {
   const [sprints, setSprints] = useState([]);
 
   useEffect(() => {
-    // If running mock, derive users/sprints from API mock data if available
-    if (process.env.REACT_APP_USE_MOCK === 'true') {
-      const mockUsers = [ { id:1, name:'Alice' }, { id:2, name:'Bob' }, { id:3, name:'Carlos' }, { id:4, name:'Diana' } ];
-      const mockSprints = [ { id:1, name:'Sprint 1' }, { id:2, name:'Sprint 2' } ];
-      setUsers(mockUsers);
-      setSprints(mockSprints);
-      setIdUsuario(mockUsers[0].id);
-      setIdSprint(mockSprints[0].id);
-    } else {
-      // Optionally fetch available users/sprints from backend endpoints if exist
-      // For now just leave empty; user can type ids.
-    }
-  }, []);
+    let mounted = true;
+    const fetchData = async () => {
+      try {
+        // try canonical users endpoint
+        const ures = await fetch('/users');
+        if (ures.ok) {
+          const udata = await ures.json();
+          if (Array.isArray(udata) && udata.length > 0) {
+            const mapped = udata.map(u => {
+              const id = u.id ?? u.ID ?? u.Id ?? u.Id;
+              const phone = u.phoneNumber ?? u.phonenumber ?? null;
+              const name = u.name ?? u.nombre ?? u.userNombre ?? u.userName ?? phone ?? (id != null ? `User ${id}` : 'User');
+              return { id, name, raw: u };
+            });
+            if (!mounted) return;
+            setUsers(mapped);
+            if (mapped.length > 0 && !idUsuario) setIdUsuario(mapped[0].id);
+          }
+        }
+      } catch (e) {
+        console.error('Failed fetching users for NewItem', e);
+      }
+
+      try {
+        const kres = await fetch('/kpi/dashboard');
+        if (kres.ok) {
+          const payload = await kres.json();
+          const tasks = payload.tasksCompletedByUserSprint || [];
+          const hours = payload.realHoursByUserSprint || [];
+
+          // build sprints
+          const sprintMap = new Map();
+          tasks.concat(hours).forEach(p => {
+            if (p && (p.sprintId != null || p.sprintId === 0)) {
+              sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
+            }
+          });
+          const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
+          if (mounted) {
+            setSprints(sList);
+            if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
+          }
+
+          // if users not populated, derive from KPI payload
+          if ((users == null || users.length === 0)) {
+            const userMap = new Map();
+            tasks.concat(hours).forEach(p => {
+              if (p && (p.userId != null || p.userId === 0)) {
+                userMap.set(p.userId, p.userNombre || `User ${p.userId}`);
+              }
+            });
+            const uList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
+            if (mounted && uList.length > 0) {
+              setUsers(uList);
+              if (!idUsuario) setIdUsuario(uList[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed fetching KPI dashboard for NewItem', e);
+      }
+    };
+    fetchData();
+    return () => { mounted = false; };
+  }, []); // run once
 
   function clearForm() {
-    setTitulo(''); setDescripcion(''); setPrioridad('MEDIUM'); setEstimacionHoras(''); setHorasReales('');
+    setTitulo('');
+    setDescripcion('');
+    setPrioridad('MEDIUM');
+    setEstimacionHoras('');
+    setHorasReales('');
+    // keep selected user/sprint
   }
 
-  function handleSubmit(e) {
-    if (e) e.preventDefault();
-    if (!titulo.trim() && !descripcion.trim()) return;
+  async function handleSubmit(e) {
+    e.preventDefault();
+    // build payload matching backend ToDoItem fields
     const payload = {
-      titulo: titulo || descripcion,
-      descripcion: descripcion || titulo,
-      prioridad: prioridad,
-      estimacionHoras: estimacionHoras ? Number(estimacionHoras) : null,
-      horasReales: horasReales ? Number(horasReales) : null,
-      idUsuario: idUsuario ? Number(idUsuario) : null,
-      idSprint: idSprint ? Number(idSprint) : null
+      titulo: titulo || descripcion || '',
+      descripcion: descripcion || titulo || '',
+      prioridad,
+      estimacionHoras: estimacionHoras === '' ? null : Number(estimacionHoras),
+      horasReales: horasReales === '' ? null : Number(horasReales),
+      idUsuario: idUsuario === '' ? null : Number(idUsuario),
+      idSprint: idSprint === '' ? null : Number(idSprint)
     };
-    // call parent addItem which uses API.create under the hood
-    props.addItem(payload);
-    clearForm();
+
+    try {
+      // delegate creation to parent which uses API.create
+      if (props.addItem) {
+        props.addItem(payload);
+      } else {
+        // fallback: call API directly
+        await API.create(payload);
+      }
+      clearForm();
+    } catch (err) {
+      console.error('Failed to submit new item', err);
+    }
   }
 
   return (
-    <div id="newinputform" className="newinput-row">
-      <form style={{width:'100%'}} onSubmit={handleSubmit}>
-        <Grid container spacing={1} alignItems="center">
+    <div>
+      <form onSubmit={handleSubmit}>
+        <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
-            <TextField label="Título" value={titulo} onChange={e=>setTitulo(e.target.value)} size="small" fullWidth />
+            <TextField fullWidth size="small" label="Título" value={titulo} onChange={e => setTitulo(e.target.value)} />
           </Grid>
           <Grid item xs={12} md={6}>
-            <TextField label="Descripción" value={descripcion} onChange={e=>setDescripcion(e.target.value)} size="small" fullWidth />
+            <TextField fullWidth size="small" label="Descripción" value={descripcion} onChange={e => setDescripcion(e.target.value)} />
+          </Grid>
+
+          <Grid item xs={6} md={3}>
+            <TextField fullWidth size="small" label="Estimación horas" value={estimacionHoras} onChange={e => setEstimacionHoras(e.target.value)} />
           </Grid>
           <Grid item xs={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Prioridad</InputLabel>
-              <Select value={prioridad} label="Prioridad" onChange={e=>setPrioridad(e.target.value)}>
-                <MenuItem value="LOW">LOW</MenuItem>
-                <MenuItem value="MEDIUM">MEDIUM</MenuItem>
-                <MenuItem value="HIGH">HIGH</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField fullWidth size="small" label="Horas reales" value={horasReales} onChange={e => setHorasReales(e.target.value)} />
           </Grid>
-          <Grid item xs={6} md={3}>
-            <TextField label="Estimación (h)" value={estimacionHoras} onChange={e=>setEstimacionHoras(e.target.value)} size="small" fullWidth />
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <TextField label="Horas reales" value={horasReales} onChange={e=>setHorasReales(e.target.value)} size="small" fullWidth />
-          </Grid>
+
           <Grid item xs={6} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Usuario</InputLabel>
-              <Select value={idUsuario} label="Usuario" onChange={e=>setIdUsuario(e.target.value)}>
-                {users.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+              <Select value={idUsuario} label="Usuario" onChange={e => setIdUsuario(e.target.value)}>
+                {users && users.length > 0 ? (
+                  users.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)
+                ) : (
+                  <MenuItem value="">(Sin usuarios disponibles)</MenuItem>
+                )}
               </Select>
             </FormControl>
           </Grid>
+
           <Grid item xs={6} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Sprint</InputLabel>
-              <Select value={idSprint} label="Sprint" onChange={e=>setIdSprint(e.target.value)}>
-                {sprints.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+              <Select value={idSprint} label="Sprint" onChange={e => setIdSprint(e.target.value)}>
+                {sprints && sprints.length > 0 ? (
+                  sprints.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)
+                ) : (
+                  <MenuItem value="">(Sin sprints disponibles)</MenuItem>
+                )}
               </Select>
             </FormControl>
           </Grid>
+
           <Grid item xs={12} md={3}>
             <InputAdornment position="end">
-              <IconButton aria-label="add" color="primary" onClick={handleSubmit} disabled={props.isInserting}>
+              <IconButton aria-label="add" color="primary" type="submit" className="add-button" disabled={props.isInserting}>
                 <AddIcon />
               </IconButton>
             </InputAdornment>

@@ -46,6 +46,9 @@ public class ToDoItemService {
     
     public ToDoItem addToDoItem(ToDoItem toDoItem){
         prepareTaskDefaults(toDoItem);
+        if (toDoItem.getID() == null) {
+            toDoItem.setID(nextTaskId());
+        }
         return toDoItemRepository.save(toDoItem);
     }
 
@@ -127,6 +130,14 @@ public class ToDoItemService {
         if (incoming.isDoneProvided()) {
             current.setDone(incoming.isDone());
         }
+    }
+
+    private int nextTaskId() {
+        List<ToDoItem> tasks = toDoItemRepository.findAllByOrderByIDDesc();
+        if (tasks == null || tasks.isEmpty() || tasks.get(0).getID() == null) {
+            return 1;
+        }
+        return tasks.get(0).getID() + 1;
     }
 
 }

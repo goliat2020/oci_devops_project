@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.model;
 
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -12,7 +13,6 @@ import java.time.OffsetDateTime;
 @Table(name = "TAREA")
 public class ToDoItem {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_TAREA")
     private Integer ID;
 
@@ -116,6 +116,7 @@ public class ToDoItem {
         this.creation_ts = creation_ts;
     }
 
+    @JsonIgnore
     public void setCreation_ts(OffsetDateTime creation_ts) {
         if (creation_ts != null) {
             this.creation_ts = creation_ts.toLocalDate();

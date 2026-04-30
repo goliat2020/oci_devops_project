@@ -20,12 +20,9 @@
     },
     "scripts": {
         "start": "react-scripts start",
-        "start:mock": "cross-env REACT_APP_USE_MOCK=true PORT=3001 react-scripts start",
         "build": "react-scripts build"
     },
-    "devDependencies": {
-        "cross-env": "^7.0.3"
-    },
+    "devDependencies": {},
     "eslintConfig": {
         "extends": "react-app"
     },
