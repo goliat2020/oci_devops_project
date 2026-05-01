@@ -29,7 +29,7 @@ public interface ToDoItemRepository extends JpaRepository<ToDoItem,Integer> {
 			    "JOIN ESTADO_TAREA et ON et.ID_ESTADO = t.ID_ESTADO " +
 			    "LEFT JOIN USUARIO u ON u.ID_USUARIO = t.ID_USUARIO " +
 			    "LEFT JOIN SPRINT s ON s.ID_SPRINT = t.ID_SPRINT " +
-				"WHERE et.ES_FINAL = 1 " +
+				"WHERE (et.ES_FINAL = 1 OR t.HORAS_REALES > 0) " +
 				"AND t.ID_PROYECTO = 1 " +
 			    "AND (:sprintId IS NULL OR t.ID_SPRINT = :sprintId) " +
 			    "GROUP BY t.ID_SPRINT, s.NOMBRE, t.ID_USUARIO, u.NOMBRE " +
