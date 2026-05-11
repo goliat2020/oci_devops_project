@@ -1,0 +1,82 @@
+name: Build & Deploy to OKE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Clonar repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configurar kubeconfig
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl config use-context context-cfwxbimnucq
+          kubectl cluster-info
+
+      # 3. Docker login a OCIR
+      - name: Docker login to OCIR
+        run: |
+          docker login -u "${{ secrets.DOCKER_USERNAME }}" \
+            -p "${{ secrets.DOCKER_PASSWORD }}" \
+            ${{ secrets.DOCKER_REGISTRY }}
+
+      # 4. Borrar deployment viejo
+      - name: Delete old pods
+        continue-on-error: true
+        run: |
+          kubectl delete deployment todolistapp-springboot-deployment -n mtdrworkshop || true
+          kubectl wait --for=delete pod -l app=todolistapp-springboot -n mtdrworkshop --timeout=120s || true
+
+      # 5. Build y push imagen Docker
+      - name: Build and push Docker image
+        env:
+          IMAGE_TAG: ${{ secrets.DOCKER_REGISTRY }}/reacttodo/fpoyo/todolistapp-springboot:latest
+        run: |
+          cd MtdrSpring/backend
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+
+      # 6. Actualizar imagen en el YAML
+      - name: Update deployment image
+        env:
+          IMAGE_TAG: ${{ secrets.DOCKER_REGISTRY }}/reacttodo/fpoyo/todolistapp-springboot:latest
+        run: |
+          cd MtdrSpring/backend
+          # Buscar el YAML más reciente y actualizar la imagen
+          YAML_FILE=$(ls -t todolistapp-springboot-*.yaml 2>/dev/null | head -1)
+          if [ -z "$YAML_FILE" ]; then
+            echo "No YAML file found, using default deployment.yaml"
+            YAML_FILE="todolistapp-springboot.yaml"
+          fi
+
+          sed -i "s|image: .*todolistapp-springboot:.*|image: $IMAGE_TAG|g" "$YAML_FILE"
+          cat "$YAML_FILE"
+
+      # 7. Aplicar deployment en Kubernetes
+      - name: Deploy to OKE
+        run: |
+          cd MtdrSpring/backend
+          YAML_FILE=$(ls -t todolistapp-springboot-*.yaml 2>/dev/null | head -1)
+          if [ -z "$YAML_FILE" ]; then
+            YAML_FILE="todolistapp-springboot.yaml"
+          fi
+
+          kubectl apply -f "$YAML_FILE" -n mtdrworkshop
+
+      # 8. Verificar deployment
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/todolistapp-springboot-deployment \
+            -n mtdrworkshop --timeout=5m
+          kubectl get pods -n mtdrworkshop
+          kubectl get svc -n mtdrworkshop
