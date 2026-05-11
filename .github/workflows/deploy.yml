@@ -14,13 +14,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Configurar kubeconfig
-      - name: Configure kubectl
+      # 2. Configurar kubeconfig usando KUBECONFIG_TOKEN
+      - name: Configure kubectl with static token
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+          cat > ~/.kube/config << 'EOF'
+          apiVersion: v1
+          clusters:
+          - cluster:
+              certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURpVENDQW5HZ0F3SUJBZ0lSQVB2T1QyNFJmZWtnU05sTWhQbk5QZUF3RFFZSktvWklodmNOQVFFTEJRQXcKWGpFUE1BMEdBMVVFQXd3R1N6aHpJRU5CTVFzd0NRWURWUVFHRXdKVlV6RVBNQTBHQTFVRUJ3d0dRWFZ6ZEdsdQpNUTh3RFFZRFZRVUtEQVpQY21GamJHVXhEREFLQmdOVkJBc01BMDlqYVRFT01Bd0dBMVVFQ0F3RlZHVjRZWE13CkhoY05Nall3TkRFM01qQTFNak0yV2hjTk16RXdOREUzTWpBMU1qTTJXakJlTVE4d0RRWURWUVFEREFaTE9ITWcKUTBFeEN6QUpCZ05WQkFZVEFsVlRNUTh3RFFZRFZRUUhEQVpCZFhOMGFXNHhEekFOQmdOVkJBb01Cazl5WVdOcwpaVEVNTUFvR0ExVUVDd3dEVDJOcE1RNHdEQVlEVlFRSURBVlVaWGhoY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCCkJRQURnZ0VQQURDQ0FRb0NnZ0VCQUpWbEVIanA2eFFEcXdxZVVDbDFMcG1HTmg5MEtHdGM4QkphanRLOGpmdmIKT1dQMXZ1NWpxdk5FR1VUeVFzdHlvVkpPdHZ2S1NodUJGQVJ3NnR5cGJwZktCVWttUmdTeGRMMUw1amhaNkl2OQp3S0kzN0lYKzRKUnNrS01VZlpDdHRQNlNpUTM1akhVRCtMai9rYVRVN3JKanEzekJkdEk5cHgrbkY2dk5LU3kzCjNQMTRCZEpkdXM5TnpXaTFEZlcvQUpoRFFyZSsvbkN4LzAwUFBtS3lDOWNqL3VQUjBOOExQNXdLQUF1SXBLRHMKOWc0cmhDQmwveGNNKzNKZnJlVCtrMUVRaXJJclVBT0pWUFFsb0FIWU9UamV6ajZQelRQeW4ycEpXOGFlWXpFQwpkTFo5Y1FUQW5XbnVmVmQ5bldEcEhkcFhDMkFQdWVNeFdiN3hrWjNVTTBFQ0F3RUFBYU5DTUVBd0R3WURWUjBUCkFRSC9CQVV3QXdFQi96QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0hRWURWUjBPQkJZRUZHY3lrQjhEb0l5OEtFdjcKR3U2OFdWQ1RmZ3lWTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFCUkkzMk41U1lNTzJETTk5Q2M2R1NwK3dvTApDeGZiZjRiblFWSTQwZXdsTjEzcnUzMmhXNnIyOHhKNWpQb20wa1Uxci9heitlbW02SHJmdHRKWHBzRGd5cDM4CmZEWjRGcjZIOXdnS0ZKRkNhOUdVNmVWR1BmT3FVa0NnT1lWcW9CZFBGVjhRNUtzMEZyQnhrdjBscWRrK2RWYWMKdXA4VEtvWEFBcVlrQXNOVGdlY3pFR3ZRTWdaR1VhbnlvM2ZmSU5LQ2xCeW5QejdOWGdGUWpDcWNqb3RvYktpRgpxZE9jWXpMNHd0Vi92RVZ4WENyaVVHNUMxbGJmMVlDTTZydW1PakdtY2xPeDd1SVJFbktpQWJmV0lVVjNMV2ZUCjNUS0oyM0lxL3dhMDB2K241NFpiSmZiMW54TFJhL1l3OWdUQUxzbWZ2d2I4MHdEMWhaekxWT1dEd1k4NwotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+              server: https://160.34.223.6:6443
+            name: cluster-cfwxbimnucq
+          contexts:
+          - context:
+              cluster: cluster-cfwxbimnucq
+              user: user-cfwxbimnucq
+            name: context-cfwxbimnucq
+          current-context: context-cfwxbimnucq
+          kind: Config
+          preferences: {}
+          users:
+          - name: user-cfwxbimnucq
+            user:
+              token: ${{ secrets.KUBECONFIG_TOKEN }}
+          EOF
+
           chmod 600 ~/.kube/config
-          kubectl config use-context context-cfwxbimnucq
           kubectl cluster-info
 
       # 3. Docker login a OCIR
