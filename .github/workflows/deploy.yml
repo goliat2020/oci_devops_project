@@ -41,7 +41,6 @@ jobs:
           EOF
 
           chmod 600 ~/.kube/config
-          kubectl cluster-info
 
       # 3. Docker login a OCIR
       - name: Docker login to OCIR
