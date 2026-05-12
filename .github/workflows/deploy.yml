@@ -42,32 +42,10 @@ jobs:
 
           chmod 600 ~/.kube/config
 
-      # 3. Install OCI CLI
-      - name: Install OCI CLI
-        run: |
-          curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash -s -- --accept-all-defaults
-          /home/runner/bin/oci --version
-
-      # 4. Setup OCI credentials
-      - name: Setup OCI credentials
-        run: |
-          mkdir -p ~/.oci
-          echo "${{ secrets.OCI_PRIVATE_KEY }}" | base64 -d > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem
-
-          cat > ~/.oci/config << EOF
-          [DEFAULT]
-          user=${{ secrets.OCI_USER_OCID }}
-          fingerprint=${{ secrets.OCI_FINGERPRINT }}
-          tenancy=${{ secrets.OCI_TENANCY_OCID }}
-          region=mx-queretaro-1
-          key_file=~/.oci/oci_api_key.pem
-          EOF
-
-      # 5. Docker login to OCIR using OCI CLI
+      # 3. Docker login to OCIR
       - name: Docker login to OCIR
         run: |
-          /home/runner/bin/oci registry docker-login --registry mx-queretaro-1.ocir.io
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "axavu6shp9jt/a00227610@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
       # 4. Borrar deployment viejo
       - name: Delete old pods
