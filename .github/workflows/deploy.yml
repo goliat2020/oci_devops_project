@@ -55,11 +55,17 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # 4b. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
       # 5. Build Spring Boot application
       - name: Build Spring Boot app
         run: |
           cd MtdrSpring/backend
-          mvn clean package -DskipTests
+          mvn clean package -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true
 
       # 6. Build and push Docker image
       - name: Build and push Docker image
