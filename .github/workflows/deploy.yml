@@ -42,12 +42,26 @@ jobs:
 
           chmod 600 ~/.kube/config
 
-      # 3. Docker login a OCIR
+      # 3. Setup OCI credentials
+      - name: Setup OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" | base64 -d > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          region=mx-queretaro-1
+          key_file=~/.oci/oci_api_key.pem
+          EOF
+
+      # 4. Docker login to OCIR using OCI CLI
       - name: Docker login to OCIR
         run: |
-          docker login -u "${{ secrets.DOCKER_USERNAME }}" \
-            -p "${{ secrets.DOCKER_PASSWORD }}" \
-            ${{ secrets.DOCKER_REGISTRY }}
+          oci registry docker-login --registry mx-queretaro-1.ocir.io
 
       # 4. Borrar deployment viejo
       - name: Delete old pods
