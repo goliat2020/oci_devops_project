@@ -65,7 +65,7 @@ jobs:
       - name: Build Spring Boot app
         run: |
           cd MtdrSpring/backend
-          mvn clean package -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true
+          mvn clean package -DskipTests -Dskip.npm=true
 
       # 6. Build and push Docker image
       - name: Build and push Docker image
