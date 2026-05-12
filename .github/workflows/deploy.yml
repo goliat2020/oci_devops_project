@@ -89,23 +89,25 @@ jobs:
           IMAGE_TAG: ${{ secrets.DOCKER_REGISTRY }}/reacttodo/fpoyo/todolistapp-springboot:latest
         run: |
           cd MtdrSpring/backend
-          # Buscar el YAML más reciente y actualizar la imagen
+          # Buscar el YAML más reciente
           YAML_FILE=$(ls -t todolistapp-springboot-*.yaml 2>/dev/null | head -1)
           if [ -z "$YAML_FILE" ]; then
-            echo "No YAML file found, using default deployment.yaml"
-            YAML_FILE="todolistapp-springboot.yaml"
+            echo "No YAML file found"
+            exit 1
           fi
 
           sed -i "s|image: .*todolistapp-springboot:.*|image: $IMAGE_TAG|g" "$YAML_FILE"
-          cat "$YAML_FILE"
+          echo "Updated $YAML_FILE with image: $IMAGE_TAG"
 
       # 9. Aplicar deployment en Kubernetes
       - name: Deploy to OKE
         run: |
           cd MtdrSpring/backend
           YAML_FILE=$(ls -t todolistapp-springboot-*.yaml 2>/dev/null | head -1)
+
           if [ -z "$YAML_FILE" ]; then
-            YAML_FILE="todolistapp-springboot.yaml"
+            echo "Error: No YAML file found"
+            exit 1
           fi
 
           kubectl apply -f "$YAML_FILE" -n mtdrworkshop
