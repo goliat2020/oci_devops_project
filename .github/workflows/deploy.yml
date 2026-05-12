@@ -47,14 +47,21 @@ jobs:
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "axavu6shp9jt/a00227610@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
-      # 4. Borrar deployment viejo
-      - name: Delete old pods
-        continue-on-error: true
-        run: |
-          kubectl delete deployment todolistapp-springboot-deployment -n mtdrworkshop || true
-          kubectl wait --for=delete pod -l app=todolistapp-springboot -n mtdrworkshop --timeout=120s || true
+      # 4. Setup Java
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: maven
 
-      # 5. Build y push imagen Docker
+      # 5. Build Spring Boot application
+      - name: Build Spring Boot app
+        run: |
+          cd MtdrSpring/backend
+          mvn clean package -DskipTests
+
+      # 6. Build and push Docker image
       - name: Build and push Docker image
         env:
           IMAGE_TAG: ${{ secrets.DOCKER_REGISTRY }}/reacttodo/fpoyo/todolistapp-springboot:latest
@@ -63,7 +70,14 @@ jobs:
           docker build -t $IMAGE_TAG .
           docker push $IMAGE_TAG
 
-      # 6. Actualizar imagen en el YAML
+      # 7. Borrar deployment viejo
+      - name: Delete old pods
+        continue-on-error: true
+        run: |
+          kubectl delete deployment todolistapp-springboot-deployment -n mtdrworkshop || true
+          kubectl wait --for=delete pod -l app=todolistapp-springboot -n mtdrworkshop --timeout=120s || true
+
+      # 8. Actualizar imagen en el YAML
       - name: Update deployment image
         env:
           IMAGE_TAG: ${{ secrets.DOCKER_REGISTRY }}/reacttodo/fpoyo/todolistapp-springboot:latest
@@ -79,7 +93,7 @@ jobs:
           sed -i "s|image: .*todolistapp-springboot:.*|image: $IMAGE_TAG|g" "$YAML_FILE"
           cat "$YAML_FILE"
 
-      # 7. Aplicar deployment en Kubernetes
+      # 9. Aplicar deployment en Kubernetes
       - name: Deploy to OKE
         run: |
           cd MtdrSpring/backend
@@ -90,7 +104,7 @@ jobs:
 
           kubectl apply -f "$YAML_FILE" -n mtdrworkshop
 
-      # 8. Verificar deployment
+      # 10. Verificar deployment
       - name: Verify deployment
         run: |
           kubectl rollout status deployment/todolistapp-springboot-deployment \
