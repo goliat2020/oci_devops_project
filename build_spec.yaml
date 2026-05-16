@@ -26,9 +26,9 @@ steps:
               oci os object get --bucket-name reacttodo-ysmiy --name deployment_config.tgz --file deployment_config.tgz;
               tar -xzvf deployment_config.tgz;
               source env.sh;
-              cat at.cfg | docker login -u "axavu6shp9jt/a00227610@tec.mx" --password-stdin phx.ocir.io
+              cat at.cfg | docker login -u "axyyzvpljivg/adan0001@gmail.com" --password-stdin mx-queretaro-1.ocir.io
 
-  - type: Command
+  - type: Command 
     name: "Build"
     command:  cd MtdrSpring;
               source env.sh;
