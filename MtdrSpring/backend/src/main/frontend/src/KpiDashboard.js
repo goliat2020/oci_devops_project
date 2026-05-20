@@ -19,11 +19,180 @@ import {
   CartesianGrid
 } from 'recharts';
 
+const COLOR_PALETTE = [
+  '#2563EB',
+  '#06B6D4',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#8B5CF6',
+  '#EC4899',
+  '#84CC16',
+  '#14B8A6',
+  '#F97316',
+  '#6366F1',
+  '#22C55E'
+];
+
+const getColor = (index) => COLOR_PALETTE[index % COLOR_PALETTE.length];
+
+const normalizeLabel = (fallbackPrefix, value, label) => {
+  if (label) {
+    return label;
+  }
+  if (value == null) {
+    return fallbackPrefix;
+  }
+  return `${fallbackPrefix} ${value}`;
+};
+
+const getPointsScope = (points, selectedSprint, selectedUser) => points.filter((point) => {
+  const sprintMatches = selectedSprint === '' || String(point.sprintId) === String(selectedSprint);
+  const userMatches = selectedUser === '' || String(point.userId) === String(selectedUser);
+  return sprintMatches && userMatches;
+});
+
+const buildCatalogs = (points) => {
+  const sprintMap = new Map();
+  const userMap = new Map();
+
+  points.forEach((point) => {
+    if (!point) {
+      return;
+    }
+    if (point.sprintId != null) {
+      sprintMap.set(String(point.sprintId), {
+        id: point.sprintId,
+        name: normalizeLabel('Sprint', point.sprintId, point.sprintNombre),
+        key: `sprint-${point.sprintId}`
+      });
+    }
+    if (point.userId != null) {
+      userMap.set(String(point.userId), {
+        id: point.userId,
+        name: normalizeLabel('Developer', point.userId, point.userNombre),
+        key: `user-${point.userId}`
+      });
+    }
+  });
+
+  return {
+    sprints: Array.from(sprintMap.values()).sort((a, b) => Number(a.id) - Number(b.id)),
+    users: Array.from(userMap.values()).sort((a, b) => Number(a.id) - Number(b.id))
+  };
+};
+
+const buildSummaryData = (tasksPoints, hoursPoints, selectedSprint, selectedUser) => {
+  const filteredTasks = getPointsScope(tasksPoints, selectedSprint, selectedUser);
+  const filteredHours = getPointsScope(hoursPoints, selectedSprint, selectedUser);
+  const summaryMap = new Map();
+
+  filteredTasks.forEach((point) => {
+    const key = String(point.userId);
+    summaryMap.set(key, {
+      key,
+      name: normalizeLabel('Developer', point.userId, point.userNombre),
+      tasks: Number(point.value || 0),
+      hours: 0
+    });
+  });
+
+  filteredHours.forEach((point) => {
+    const key = String(point.userId);
+    const current = summaryMap.get(key) || {
+      key,
+      name: normalizeLabel('Developer', point.userId, point.userNombre),
+      tasks: 0,
+      hours: 0
+    };
+    current.hours += Number(point.value || 0);
+    summaryMap.set(key, current);
+  });
+
+  return Array.from(summaryMap.values());
+};
+
+const buildStackedChartData = (points, selectedSprint, selectedUser, allPointsForCatalogs) => {
+  const { sprints, users } = buildCatalogs(allPointsForCatalogs || points);
+  const scopedPoints = getPointsScope(points, selectedSprint, selectedUser);
+  const sprintsForChart = selectedSprint === ''
+    ? sprints
+    : sprints.filter((sprint) => String(sprint.id) === String(selectedSprint));
+  const usersForChart = selectedUser === ''
+    ? users
+    : users.filter((user) => String(user.id) === String(selectedUser));
+
+  const rows = sprintsForChart.map((sprint) => {
+    const row = {
+      sprintId: sprint.id,
+      sprintNombre: sprint.name
+    };
+    usersForChart.forEach((user) => {
+      row[user.key] = 0;
+    });
+    return row;
+  });
+
+  const rowMap = new Map(rows.map((row) => [String(row.sprintId), row]));
+
+  scopedPoints.forEach((point) => {
+    const row = rowMap.get(String(point.sprintId));
+    const user = usersForChart.find((item) => String(item.id) === String(point.userId));
+    if (row && user) {
+      row[user.key] = (row[user.key] || 0) + Number(point.value || 0);
+    }
+  });
+
+  return {
+    chartData: rows,
+    usersForChart
+  };
+};
+
+const renderSeries = (usersForChart) => usersForChart.map((user, index) => (
+  <Bar
+    key={user.key}
+    dataKey={user.key}
+    name={user.name}
+    fill={getColor(index)}
+    isAnimationActive={false}
+  />
+));
+
+const renderSeriesWithLabels = (usersForChart) => usersForChart.map((user, index) => {
+  const CustomLabel = (props) => {
+    const { x, y, width, value } = props;
+    if (value === null || value === undefined) return null;
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 5}
+        fill="#000"
+        textAnchor="middle"
+        fontSize={12}
+        fontWeight="bold"
+      >
+        {Math.round(value)}
+      </text>
+    );
+  };
+
+  return (
+    <Bar
+      key={`bar-${index}`}
+      dataKey={user.key}
+      name={user.name}
+      fill={getColor(index)}
+      isAnimationActive={false}
+      label={<CustomLabel />}
+    />
+  );
+});
+
 function KpiDashboard() {
   const [dataTasks, setDataTasks] = useState([]);
   const [dataHours, setDataHours] = useState([]);
-  const [sprints, setSprints] = useState([]);
-  const [selectedSprint, setSelectedSprint] = useState(null);
+  const [selectedSprint, setSelectedSprint] = useState('');
   const [selectedUser, setSelectedUser] = useState('');
   const [insights, setInsights] = useState([]);
   const [actions, setActions] = useState([]);
@@ -38,14 +207,6 @@ function KpiDashboard() {
         setDataTasks(tasks);
         setDataHours(hours);
         // derive sprints
-        const sprintMap = new Map();
-        tasks.concat(hours).forEach(p => { if (p && p.sprintId != null) sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`); });
-        const sList = Array.from(sprintMap.entries()).map(([id,name]) => ({id,name}));
-        setSprints(sList);
-        if (sList.length>0) setSelectedSprint(sList[0].id);
-        // derive user list (names are used elsewhere to filter)
-        const userMap = new Map();
-        tasks.concat(hours).forEach(p => { if (p && p.userId!=null) userMap.set(p.userId, p.userNombre); });
         setSelectedUser('');
       })
       .catch(err => {
@@ -53,40 +214,16 @@ function KpiDashboard() {
       });
   }, []);
 
-  function pointsForSprint(points, sprintId) {
-    return points.filter(p => (sprintId==null) || (p.sprintId === sprintId));
-  }
-
-  // Build chart data for selected sprint: array of { name:userNombre, tasks: value, hours: value }
-  function buildChartData(sprintId, userFilter) {
-    const tasks = pointsForSprint(dataTasks, sprintId);
-    const hours = pointsForSprint(dataHours, sprintId);
-    const map = new Map();
-    tasks.forEach(p=> map.set(p.userNombre || `User ${p.userId}`, { name: p.userNombre || `User ${p.userId}`, tasks: p.value || 0, hours: 0 }));
-    hours.forEach(p=> {
-      const key = p.userNombre || `User ${p.userId}`;
-      const cur = map.get(key) || { name: key, tasks: 0, hours: 0 };
-      cur.hours = p.value || 0;
-      map.set(key, cur);
-    });
-    const results = Array.from(map.values());
-    if (userFilter && userFilter !== '') {
-      return results.filter(r => r.name === userFilter);
-    }
-    return results;
-  }
-
-  // Extract unique users for filter dropdown (both dataTasks and dataHours)
-  const usersMap = new Map();
-  dataTasks.concat(dataHours).forEach(p => { if (p && p.userId!=null) usersMap.set(p.userNombre, p.userId); });
-  const usersList = Array.from(usersMap.keys());
-
-  const chartData = useMemo(() => buildChartData(selectedSprint, selectedUser), [dataTasks, dataHours, selectedSprint, selectedUser]);
+  const allPoints = useMemo(() => dataTasks.concat(dataHours), [dataTasks, dataHours]);
+  const { sprints: sprintOptions, users: userOptions } = useMemo(() => buildCatalogs(allPoints), [allPoints]);
+  const tasksSummary = useMemo(() => buildSummaryData(dataTasks, dataHours, selectedSprint, selectedUser), [dataTasks, dataHours, selectedSprint, selectedUser]);
+  const tasksChart = useMemo(() => buildStackedChartData(dataTasks, selectedSprint, selectedUser, allPoints), [dataTasks, selectedSprint, selectedUser, allPoints]);
+  const hoursChart = useMemo(() => buildStackedChartData(dataHours, selectedSprint, selectedUser, allPoints), [dataHours, selectedSprint, selectedUser, allPoints]);
 
   // Metrics
-  const totalHours = chartData.reduce((s,x)=> s + (x.hours||0), 0);
-  const totalTasks = chartData.reduce((s,x)=> s + (x.tasks||0), 0);
-  const devCount = chartData.length || 1;
+  const totalHours = tasksSummary.reduce((s,x)=> s + (x.hours||0), 0);
+  const totalTasks = tasksSummary.reduce((s,x)=> s + (x.tasks||0), 0);
+  const devCount = tasksSummary.length || 1;
   const avgTasksPerDev = devCount ? (totalTasks / devCount) : 0;
   const avgHoursPerDev = devCount ? (totalHours / devCount) : 0;
 
@@ -94,11 +231,11 @@ function KpiDashboard() {
   useEffect(() => {
     const ins = [];
     const act = [];
-    if (chartData.length === 0) {
+    if (tasksSummary.length === 0) {
       ins.push('No data disponible para el sprint seleccionado.');
     } else {
   // find top/bottom performers
-  const sortedByTasks = [...chartData].sort((a,b)=> b.tasks - a.tasks);
+  const sortedByTasks = [...tasksSummary].sort((a,b)=> b.tasks - a.tasks);
       const topTasks = sortedByTasks[0];
       const lowTasks = sortedByTasks[sortedByTasks.length-1];
       if (topTasks && lowTasks && (topTasks.tasks - lowTasks.tasks) / Math.max(1, topTasks.tasks) > 0.6) {
@@ -110,7 +247,7 @@ function KpiDashboard() {
         act.push('Analizar tareas que consumen muchas horas y verificar estimaciones. Planificar reducción de scope o redistribución.');
       }
       // find outliers in hours vs tasks
-      chartData.forEach(d => {
+      tasksSummary.forEach(d => {
         if (d.tasks > 0 && (d.hours / d.tasks) > 20) {
           ins.push(`${d.name} tiene alto ratio horas/tarea (${(d.hours/d.tasks).toFixed(1)}h por task).`);
           act.push(`Investigar bloqueos o tareas mal estimadas para ${d.name}. Facilitar soporte técnico o clarification de requisitos.`);
@@ -123,7 +260,7 @@ function KpiDashboard() {
     }
     setInsights(ins);
     setActions(act);
-  }, [selectedSprint, dataTasks, dataHours, avgHoursPerDev, chartData]);
+  }, [selectedSprint, dataTasks, dataHours, avgHoursPerDev, tasksSummary]);
 
   return (
     <Box sx={{mt:2}}>
@@ -135,16 +272,16 @@ function KpiDashboard() {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2">Sprint</Typography>
-            <Select value={selectedSprint ?? ''} onChange={e => setSelectedSprint(e.target.value)} size="small" sx={{mr:1}}>
+            <Select value={selectedSprint} onChange={e => setSelectedSprint(e.target.value)} size="small" sx={{mr:1}}>
               <MenuItem value="">Todos</MenuItem>
-              {sprints.map(s => (
+              {sprintOptions.map(s => (
                 <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
               ))}
             </Select>
             <Typography variant="body2" sx={{ml:2}}>Usuario</Typography>
             <Select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} size="small">
               <MenuItem value="">Todos</MenuItem>
-              {usersList.map(u => (<MenuItem key={u} value={u}>{u}</MenuItem>))}
+              {userOptions.map(u => (<MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>))}
             </Select>
           </Grid>
         </Grid>
@@ -152,31 +289,31 @@ function KpiDashboard() {
 
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{p:2, height:360}}>
-            <Typography variant="subtitle1">Tareas completadas por usuario</Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+          <Paper sx={{p:2, height:420}}>
+            <Typography variant="subtitle1">Tareas completadas por developer por sprint</Typography>
+            <ResponsiveContainer width="100%" height={340}>
+              <BarChart data={tasksChart.chartData} margin={{ top: 40, right: 30, left: 0, bottom: 5 }} barCategoryGap="18%" barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="sprintNombre" />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="tasks" fill="#2563EB" />
+                {renderSeriesWithLabels(tasksChart.usersForChart)}
               </BarChart>
             </ResponsiveContainer>
           </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Paper sx={{p:2, height:360}}>
-            <Typography variant="subtitle1">Horas reales por usuario</Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+          <Paper sx={{p:2, height:420}}>
+            <Typography variant="subtitle1">Horas reales por developer por sprint</Typography>
+            <ResponsiveContainer width="100%" height={340}>
+              <BarChart data={hoursChart.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }} barCategoryGap="18%" barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis dataKey="sprintNombre" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="hours" fill="#06B6D4" />
+                {renderSeries(hoursChart.usersForChart)}
               </BarChart>
             </ResponsiveContainer>
           </Paper>
