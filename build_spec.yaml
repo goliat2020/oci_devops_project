@@ -32,6 +32,7 @@ steps:
     name: "Build"
     command: cd MtdrSpring;
              source env.sh;
+             rm -rf backend/src/main/frontend/build;
              (cd backend;source build.sh)
 
   - type: Command
