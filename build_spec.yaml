@@ -61,6 +61,6 @@ steps:
     name: "Deploy"
     command: export PATH=$PATH:$HOME/k8s;
              export KUBECONFIG=$HOME/.kube/config;
-             cd MtdrSpring/backend;
-             source ../env.sh;
-             source deploy.sh
+             cd MtdrSpring;
+             source env.sh;
+             (cd backend; source deploy.sh)
