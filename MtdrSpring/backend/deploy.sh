@@ -39,9 +39,8 @@ if [ -z "$UI_USERNAME" ]; then
 fi
 
 if [ -z "$IMAGE_VERSION" ]; then
-    export IMAGE_VERSION=$(cat /tmp/image_version.txt)
-    sed -e "s|%IMAGE_VERSION%|${IMAGE_VERSION}|g" todolistapp-springboot-${CURRENTTIME}.yaml > /tmp/todolistapp-springboot-${CURRENTTIME}.yaml
-    mv -- /tmp/todolistapp-springboot-$CURRENTTIME.yaml todolistapp-springboot-$CURRENTTIME.yaml
+    export IMAGE_VERSION="${BuildServiceDemoVersion:-0.1}"
+    echo "IMAGE_VERSION set."
 fi
 
 echo "Creating springboot deplyoment and service"

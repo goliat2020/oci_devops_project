@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export IMAGE_NAME=todolistapp-springboot
-export IMAGE_VERSION=$(date +%Y%m%d%H%M%S)
+export IMAGE_VERSION=0.1
 echo $IMAGE_VERSION > /tmp/image_version.txt
 
 
