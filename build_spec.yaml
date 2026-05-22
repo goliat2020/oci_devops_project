@@ -48,12 +48,9 @@ steps:
              export KUBECONFIG=$HOME/.kube/config
 
   - type: Command
-    name: "Undeploy"
-    ignoreFailure: True
+    name: "Restart Pods"
     command: export PATH=$PATH:$HOME/k8s;
              export KUBECONFIG=$HOME/.kube/config;
-             cd MtdrSpring/backend;
-             source ../env.sh;
-             kubectl -n mtdrworkshop delete deployment todolistapp-springboot-deployment;
-             kubectl -n mtdrworkshop delete service todolistapp-springboot-service
-             
+             oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaasu4y2kuzyk4edovsnnwnc4bomnm2ieg7golm5pnb2cfwxbimnucq --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT;
+             kubectl rollout restart deployment/todolistapp-springboot-deployment -n mtdrworkshop;
+             kubectl rollout status deployment/todolistapp-springboot-deployment -n mtdrworkshop
