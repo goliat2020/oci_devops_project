@@ -32,6 +32,7 @@ steps:
     name: "Build"
     command: cd MtdrSpring;
              source env.sh;
+             export BuildServiceDemoVersion=${BuildServiceDemoVersion:-$(date +%Y%m%d%H%M%S)};
              rm -rf backend/src/main/frontend/build;
              (cd backend;source build.sh)
 
