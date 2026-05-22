@@ -142,7 +142,7 @@ function App() {
       >
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
-            OHolaracle Project Admin PRUEBA
+            Mi Nuevo Título                                               
           </Typography>
           <Stack direction="row" spacing={1}>
             <Button
