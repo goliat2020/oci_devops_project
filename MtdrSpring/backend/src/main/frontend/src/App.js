@@ -142,7 +142,7 @@ function App() {
       >
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
-            Mi Nuevo Título                                               
+            Oracle Project Planner                                               
           </Typography>
           <Stack direction="row" spacing={1}>
             <Button
