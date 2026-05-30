@@ -43,6 +43,7 @@ frontend/build
 .env.test.local
 .env.production.local
 .idea
+.structurizr/
 
 frontend/package-lock.json
 frontend/npm-debug.log*
