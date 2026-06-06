@@ -1,310 +1,236 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  Chip,
-  CircularProgress,
-  FormControl,
-  Grid,
-  InputLabel,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  TextField,
-  Typography
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, Typography, TextField, Button, Paper, CircularProgress, Alert,
+  Card, CardContent, Divider, Chip, Stack, List, ListItem, ListItemText, ListItemIcon, IconButton, Grid
 } from '@mui/material';
-import API from './API';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SendIcon from '@mui/icons-material/Send';
+import AddTaskIcon from '@mui/icons-material/AddTask';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import LightbulbCircleIcon from '@mui/icons-material/LightbulbCircle';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-const normalizeNumber = (value, fallback = null) => {
-  if (value === '' || value === null || value === undefined) {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const toCreatePayload = (task, defaults = {}) => ({
-  titulo: task.titulo || task.title || task.descripcion || task.description || 'Tarea generada',
-  descripcion: task.descripcion || task.description || task.titulo || task.title || 'Tarea generada por IA',
-  prioridad: task.prioridad || 'MEDIUM',
-  estimacionHoras: normalizeNumber(task.estimacionHoras, 2),
-  horasReales: normalizeNumber(task.horasReales, 0),
-  idUsuario: normalizeNumber(task.idUsuario, defaults.defaultUserId),
-  idSprint: normalizeNumber(task.idSprint, defaults.defaultSprintId),
-  idProyecto: normalizeNumber(task.idProyecto, defaults.defaultProjectId),
-  idEstado: normalizeNumber(task.idEstado, 1),
-  done: false
-});
-
-function AiPlanner(props) {
-  const [prompt, setPrompt] = useState('Construye un panel para gestionar reservas de un laboratorio, con autenticación, calendario, recordatorios y reportes.');
-  const [taskCount, setTaskCount] = useState(6);
-  const [defaultUserId, setDefaultUserId] = useState('');
-  const [defaultSprintId, setDefaultSprintId] = useState('');
+export default function AiPlanner({ onAddTask, onBack }) {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [tasks, setTasks] = useState([]);
-  const DEFAULT_PROJECT_ID = 1;
-
-  const defaults = useMemo(() => ({
-    defaultUserId: normalizeNumber(defaultUserId, null),
-    defaultSprintId: normalizeNumber(defaultSprintId, null),
-    defaultProjectId: DEFAULT_PROJECT_ID
-  }), [defaultUserId, defaultSprintId]);
+  
+  const [defaultUserId, setDefaultUserId] = useState(null);
+  const [defaultSprintId, setDefaultSprintId] = useState(null);
 
   useEffect(() => {
     let mounted = true;
-
-    const fetchCatalogs = async () => {
+    const loadMetadata = async () => {
       try {
-        const dashboardResponse = await fetch('/kpi/dashboard');
-        if (dashboardResponse.ok) {
-          const dashboard = await dashboardResponse.json();
-          const userMap = new Map();
-          const sprintMap = new Map();
-
-          const processPoint = (point) => {
-            if (point && point.userId != null) {
-              userMap.set(point.userId, point.userNombre || `Usuario ${point.userId}`);
-            }
-            if (point && (point.sprintId != null || point.sprintId === 0)) {
-              sprintMap.set(point.sprintId, point.sprintNombre || `Sprint ${point.sprintId}`);
-            }
-          };
-
-          (dashboard.tasksCompletedByUserSprint || []).forEach(processPoint);
-          (dashboard.realHoursByUserSprint || []).forEach(processPoint);
-
-          if (mounted) {
-            const usersList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
-            const sprintsList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
-            setUsers(usersList);
-            setSprints(sprintsList);
-            if (usersList.length > 0 && !defaultUserId) {
-              setDefaultUserId(String(usersList[0].id));
-            }
-            if (sprintsList.length > 0 && !defaultSprintId) {
-              setDefaultSprintId(String(sprintsList[0].id));
-            }
+        const ures = await fetch('/users');
+        if (ures.ok) {
+          const udata = await ures.json();
+          if (mounted && Array.isArray(udata)) {
+            setUsers(udata);
+            if (udata.length > 0) setDefaultUserId(udata[0].id || udata[0].ID);
           }
         }
-      } catch (catalogError) {
-        console.error('Failed fetching KPI dashboard for AI planner', catalogError);
+        
+        const kres = await fetch('/kpi/dashboard');
+        if (kres.ok) {
+          const payload = await kres.json();
+          const pTasks = payload.tasksCompletedByUserSprint || [];
+          const pHours = payload.realHoursByUserSprint || [];
+          const sMap = new Map();
+          pTasks.concat(pHours).forEach(p => {
+             if (p && p.sprintId != null) {
+               sMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
+             }
+          });
+          if (mounted && sMap.size > 0) {
+            const arr = Array.from(sMap.keys());
+            setDefaultSprintId(arr[0]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load users/sprints for AI Planner", err);
       }
     };
-
-    fetchCatalogs();
-    return () => {
-      mounted = false;
-    };
+    loadMetadata();
+    return () => { mounted = false; };
   }, []);
 
-  const resolveUserName = (value) => {
-    const numericValue = normalizeNumber(value, null);
-    if (numericValue == null) {
-      return 'Sin definir';
-    }
-    const match = users.find((user) => String(user.id) === String(numericValue));
-    return match ? match.name : `Usuario ${numericValue}`;
-  };
-
-  const resolveSprintName = (value) => {
-    const numericValue = normalizeNumber(value, null);
-    if (numericValue == null) {
-      return 'Sin definir';
-    }
-    const match = sprints.find((sprint) => String(sprint.id) === String(numericValue));
-    return match ? match.name : `Sprint ${numericValue}`;
-  };
-
-  const resolveProjectName = (value) => {
-    return 'Proyecto principal';
-  };
-
-  const selectedUserLabel = resolveUserName(defaultUserId);
-  const selectedSprintLabel = resolveSprintName(defaultSprintId);
-  const selectedProjectLabel = 'Proyecto principal';
-
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      setError('Escribe una tarea grande para que Gemini la desmenuce.');
-      return;
-    }
+    if (!prompt.trim()) return;
     setLoading(true);
-    setError('');
-    try {
-      const response = await API.generatePlan({
-        prompt,
-        taskCount: normalizeNumber(taskCount, 6),
-        defaultUserId: defaults.defaultUserId,
-        defaultSprintId: defaults.defaultSprintId,
-        defaultProjectId: defaults.defaultProjectId
-      });
-      setTasks(Array.isArray(response) ? response : []);
-    } catch (e) {
-      setError(e.message || 'No se pudo generar el plan.');
-      setTasks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setError(null);
+    setResult(null);
 
-  const handleAddOne = async (task) => {
     try {
-      await props.onAddTask(toCreatePayload(task, defaults));
-    } catch (e) {
-      setError(e.message || 'No se pudo agregar la tarea.');
+       const res = await fetch('/ai/plan', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ prompt: prompt.trim() })
+       });
+       
+       if (!res.ok) {
+         throw new Error(`Error ${res.status}: ${res.statusText}`);
+       }
+       
+       const data = await res.json();
+       setResult(data);
+    } catch (err) {
+       setError(err.message);
+    } finally {
+       setLoading(false);
     }
   };
 
   const handleAddAll = async () => {
-    if (tasks.length === 0) {
-      return;
-    }
-    for (const task of tasks) {
-      // Sequential insertion avoids saturating the backend and preserves order.
-      // eslint-disable-next-line no-await-in-loop
-      await handleAddOne(task);
-    }
+     if (!result || !result.tasks) return;
+     let successCount = 0;
+     for (const t of result.tasks) {
+        const payload = {
+          titulo: t.titulo || t.title || 'AI Task',
+          descripcion: t.descripcion || t.description || '',
+          prioridad: t.prioridad || 'MEDIUM',
+          estimacionHoras: t.estimacionHoras ? Number(t.estimacionHoras) : null,
+          idUsuario: defaultUserId ? Number(defaultUserId) : null,
+          idSprint: defaultSprintId ? Number(defaultSprintId) : null
+        };
+        try {
+          if (onAddTask) {
+            await onAddTask(payload);
+            successCount++;
+          }
+        } catch (e) {
+          console.error("Failed adding task from AI", e);
+        }
+     }
+     alert(`¡${successCount} tareas importadas con éxito al tablero!`);
+     if (onBack) onBack();
   };
 
   return (
-    <Box>
-      <Box className="hero ai-hero">
-        <Typography variant="h4" gutterBottom>Asistente de IA</Typography>
-        <Typography variant="body2" color="textSecondary">
-          Escribe una tarea grande y Gemini la convierte en tareas pequeñas listas para guardar.
+    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Box display="flex" alignItems="center" gap={2}>
+        {onBack && (
+          <IconButton onClick={onBack} sx={{ bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+            <ArrowBackIcon />
+          </IconButton>
+        )}
+        <Typography variant="h4" fontWeight="800" sx={{ letterSpacing: '-0.5px' }}>
+          Asistente IAM
         </Typography>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {/* Input Section */}
+      <Paper 
+        elevation={0}
+        sx={{ 
+           p: 4, 
+           borderRadius: 3, 
+           background: 'linear-gradient(145deg, rgba(88, 28, 135, 0.15) 0%, rgba(31, 41, 55, 0.4) 100%)',
+           border: '1px solid rgba(139, 92, 246, 0.2)'
+        }}
+      >
+        <Stack direction="row" alignItems="center" gap={1.5} mb={3}>
+           <SmartToyIcon sx={{ color: '#8B5CF6' }} />
+           <Typography variant="h6" fontWeight="600" color="text.primary">
+             Generador Inteligente de Workflows
+           </Typography>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" mb={3}>
+          Describe el proyecto o feature que quieres construir, y la IA del backend lo desglosará automáticamente en tareas de desarrollo (sprints, historias y estimaciones) listas para trabajar.
+        </Typography>
 
-      <Paper variant="outlined" className="task-card ai-panel" sx={{ p: 2, mb: 2 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <TextField
-              label="Tarea grande"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              multiline
-              minRows={5}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Cantidad de tareas"
-              type="number"
-              value={taskCount}
-              onChange={(e) => setTaskCount(e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Usuario por defecto</InputLabel>
-              <Select
-                value={defaultUserId}
-                label="Usuario por defecto"
-                onChange={(e) => setDefaultUserId(e.target.value)}
-              >
-                {users.length > 0 ? users.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>{user.name}</MenuItem>
-                )) : (
-                  <MenuItem value="1">Usuario 1</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Sprint por defecto</InputLabel>
-              <Select
-                value={defaultSprintId}
-                label="Sprint por defecto"
-                onChange={(e) => setDefaultSprintId(e.target.value)}
-              >
-                {sprints.length > 0 ? sprints.map((sprint) => (
-                  <MenuItem key={sprint.id} value={sprint.id}>{sprint.name}</MenuItem>
-                )) : (
-                  <MenuItem value="1">Sprint 1</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', border: '1px solid #ddd', p: 2, borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                Proyecto
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                {selectedProjectLabel}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Button variant="contained" onClick={handleGenerate} disabled={loading}>
-                {loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Generar plan'}
-              </Button>
-              <Button variant="outlined" onClick={handleAddAll} disabled={tasks.length === 0}>
-                Agregar todas
-              </Button>
-              <Button variant="text" onClick={props.onBack}>
-                Volver al tablero
-              </Button>
-            </Stack>
-          </Grid>
-        </Grid>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField 
+            fullWidth 
+            variant="filled"
+            placeholder="Ej: Quiero un módulo de autenticación con JWT y Spring Security..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            disabled={loading}
+            multiline
+            minRows={2}
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleGenerate}
+            disabled={loading || !prompt.trim()}
+            sx={{ 
+                px: 4, minWidth: 200, 
+                background: 'linear-gradient(90deg, #6366F1, #8B5CF6)',
+                '&:hover': { background: 'linear-gradient(90deg, #4F46E5, #7C3AED)' }
+            }}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AutoAwesomeIcon />}
+          >
+            {loading ? 'Generando...' : 'Generar Plan'}
+          </Button>
+        </Stack>
       </Paper>
 
-      {tasks.length > 0 && (
-        <Box>
-          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
-            <Chip label={`${tasks.length} tareas generadas`} color="primary" variant="outlined" />
-            <Chip label="Campos listos para la BD" color="success" variant="outlined" />
-            <Chip label={`Usuario: ${selectedUserLabel}`} variant="outlined" />
-            <Chip label={`Sprint: ${selectedSprintLabel}`} variant="outlined" />
-            <Chip label={`Proyecto: ${selectedProjectLabel}`} variant="outlined" />
-          </Stack>
+      {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-          <Grid container spacing={2}>
-            {tasks.map((task, index) => (
-              <Grid item xs={12} md={6} key={`${task.titulo || task.descripcion || index}-${index}`}>
-                <Card className="task-card ai-task-card">
-                  <CardContent>
-                    <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
-                      <Chip size="small" label={task.prioridad || 'MEDIUM'} />
-                      <Chip size="small" label={`${normalizeNumber(task.estimacionHoras, 2)} h`} />
-                    </Stack>
-                    <Typography className="task-desc">{task.titulo || task.descripcion}</Typography>
-                    <Typography className="task-meta" sx={{ mt: 1 }}>
-                      {task.descripcion || task.titulo}
-                    </Typography>
-                    <Typography className="task-meta" sx={{ mt: 1 }}>
-                      Usuario: {resolveUserName(task.idUsuario ?? task.userId ?? task.userNombre)} | Sprint: {resolveSprintName(task.idSprint ?? task.sprintId ?? task.sprintNombre)} | Proyecto: {resolveProjectName(task.idProyecto)}
-                    </Typography>
-                  </CardContent>
-                  <CardActions>
-                    <Button variant="contained" onClick={() => handleAddOne(task)}>
-                      Agregar tarea
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
+      {/* Result Section */}
+      {result && (
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'background.paper', mb: 8 }}>
+           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
+              <Box>
+                <Typography variant="h5" fontWeight="700">Plan Sugerido</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {result.tasks ? result.tasks.length : 0} tareas generadas
+                </Typography>
+              </Box>
+              <Button 
+                variant="contained" 
+                color="success" 
+                startIcon={<AddTaskIcon />}
+                onClick={handleAddAll}
+                sx={{ px: 3, py: 1 }}
+              >
+                Importar todas las tareas ({result.tasks?.length})
+              </Button>
+           </Box>
+
+           <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)', mb: 3 }} />
+
+           <Grid container spacing={3}>
+              {(result.tasks || []).map((t, i) => (
+                 <Grid item xs={12} sm={6} key={i}>
+                    <Card 
+                        elevation={0}
+                        sx={{ 
+                            height: '100%', 
+                            borderRadius: 2, 
+                            border: '1px solid rgba(255,255,255,0.03)',
+                            background: 'rgba(255,255,255,0.01)',
+                            '&:hover': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                        }}
+                    >
+                       <CardContent>
+                          <Box display="flex" justifyContent="space-between" mb={2}>
+                            <Typography variant="subtitle1" fontWeight="600" color="text.primary">
+                                {t.titulo || t.title}
+                            </Typography>
+                            {t.estimacionHoras && (
+                                <Chip label={`${t.estimacionHoras}h`} size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontWeight: 'bold' }} />
+                            )}
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                             {t.descripcion || t.description}
+                          </Typography>
+                          <Stack direction="row" spacing={1} mt={3}>
+                             <Chip label={`Prio: ${t.prioridad || 'MID'}`} size="small" variant="outlined" sx={{ color: 'text.secondary', borderColor: 'rgba(255,255,255,0.1)' }}/>
+                          </Stack>
+                       </CardContent>
+                    </Card>
+                 </Grid>
+              ))}
+           </Grid>
+        </Paper>
       )}
     </Box>
   );
 }
-
-export default AiPlanner;

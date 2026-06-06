@@ -1,353 +1,285 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
-import {
-  Typography,
-  Paper,
-  Box,
-  Select,
-  MenuItem,
-  Grid
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Box, Typography, Grid, Paper, Card, CardContent, CircularProgress, Alert,
+  Stack, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  CartesianGrid
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import SpeedIcon from '@mui/icons-material/Speed';
 
-const COLOR_PALETTE = [
-  '#2563EB',
-  '#06B6D4',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-  '#8B5CF6',
-  '#EC4899',
-  '#84CC16',
-  '#14B8A6',
-  '#F97316',
-  '#6366F1',
-  '#22C55E'
-];
+const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6', '#3B82F6', '#14B8A6'];
 
-const getColor = (index) => COLOR_PALETTE[index % COLOR_PALETTE.length];
+export default function KpiDashboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const normalizeLabel = (fallbackPrefix, value, label) => {
-  if (label) {
-    return label;
-  }
-  if (value == null) {
-    return fallbackPrefix;
-  }
-  return `${fallbackPrefix} ${value}`;
-};
-
-const getPointsScope = (points, selectedSprint, selectedUser) => points.filter((point) => {
-  const sprintMatches = selectedSprint === '' || String(point.sprintId) === String(selectedSprint);
-  const userMatches = selectedUser === '' || String(point.userId) === String(selectedUser);
-  return sprintMatches && userMatches;
-});
-
-const buildCatalogs = (points) => {
-  const sprintMap = new Map();
-  const userMap = new Map();
-
-  points.forEach((point) => {
-    if (!point) {
-      return;
-    }
-    if (point.sprintId != null) {
-      sprintMap.set(String(point.sprintId), {
-        id: point.sprintId,
-        name: normalizeLabel('Sprint', point.sprintId, point.sprintNombre),
-        key: `sprint-${point.sprintId}`
-      });
-    }
-    if (point.userId != null) {
-      userMap.set(String(point.userId), {
-        id: point.userId,
-        name: normalizeLabel('Developer', point.userId, point.userNombre),
-        key: `user-${point.userId}`
-      });
-    }
-  });
-
-  return {
-    sprints: Array.from(sprintMap.values()).sort((a, b) => Number(a.id) - Number(b.id)),
-    users: Array.from(userMap.values()).sort((a, b) => Number(a.id) - Number(b.id))
-  };
-};
-
-const buildSummaryData = (tasksPoints, hoursPoints, selectedSprint, selectedUser) => {
-  const filteredTasks = getPointsScope(tasksPoints, selectedSprint, selectedUser);
-  const filteredHours = getPointsScope(hoursPoints, selectedSprint, selectedUser);
-  const summaryMap = new Map();
-
-  filteredTasks.forEach((point) => {
-    const key = String(point.userId);
-    summaryMap.set(key, {
-      key,
-      name: normalizeLabel('Developer', point.userId, point.userNombre),
-      tasks: Number(point.value || 0),
-      hours: 0
-    });
-  });
-
-  filteredHours.forEach((point) => {
-    const key = String(point.userId);
-    const current = summaryMap.get(key) || {
-      key,
-      name: normalizeLabel('Developer', point.userId, point.userNombre),
-      tasks: 0,
-      hours: 0
-    };
-    current.hours += Number(point.value || 0);
-    summaryMap.set(key, current);
-  });
-
-  return Array.from(summaryMap.values());
-};
-
-const buildStackedChartData = (points, selectedSprint, selectedUser, allPointsForCatalogs) => {
-  const { sprints, users } = buildCatalogs(allPointsForCatalogs || points);
-  const scopedPoints = getPointsScope(points, selectedSprint, selectedUser);
-  const sprintsForChart = selectedSprint === ''
-    ? sprints
-    : sprints.filter((sprint) => String(sprint.id) === String(selectedSprint));
-  const usersForChart = selectedUser === ''
-    ? users
-    : users.filter((user) => String(user.id) === String(selectedUser));
-
-  const rows = sprintsForChart.map((sprint) => {
-    const row = {
-      sprintId: sprint.id,
-      sprintNombre: sprint.name
-    };
-    usersForChart.forEach((user) => {
-      row[user.key] = 0;
-    });
-    return row;
-  });
-
-  const rowMap = new Map(rows.map((row) => [String(row.sprintId), row]));
-
-  scopedPoints.forEach((point) => {
-    const row = rowMap.get(String(point.sprintId));
-    const user = usersForChart.find((item) => String(item.id) === String(point.userId));
-    if (row && user) {
-      row[user.key] = (row[user.key] || 0) + Number(point.value || 0);
-    }
-  });
-
-  return {
-    chartData: rows,
-    usersForChart
-  };
-};
-
-const renderSeries = (usersForChart) => usersForChart.map((user, index) => (
-  <Bar
-    key={user.key}
-    dataKey={user.key}
-    name={user.name}
-    fill={getColor(index)}
-    isAnimationActive={false}
-  />
-));
-
-const renderSeriesWithLabels = (usersForChart) => usersForChart.map((user, index) => {
-  const CustomLabel = (props) => {
-    const { x, y, width, value } = props;
-    if (value === null || value === undefined) return null;
-    return (
-      <text
-        x={x + width / 2}
-        y={y - 5}
-        fill="#000"
-        textAnchor="middle"
-        fontSize={12}
-        fontWeight="bold"
-      >
-        {Math.round(value)}
-      </text>
-    );
-  };
-
-  return (
-    <Bar
-      key={`bar-${index}`}
-      dataKey={user.key}
-      name={user.name}
-      fill={getColor(index)}
-      isAnimationActive={false}
-      label={<CustomLabel />}
-    />
-  );
-});
-
-function KpiDashboard() {
-  const [dataTasks, setDataTasks] = useState([]);
-  const [dataHours, setDataHours] = useState([]);
-  const [selectedSprint, setSelectedSprint] = useState('');
-  const [selectedUser, setSelectedUser] = useState('');
-  const [insights, setInsights] = useState([]);
-  const [actions, setActions] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('ALL');
+  const [selectedSprint, setSelectedSprint] = useState('ALL');
 
   useEffect(() => {
-    // fetch KPI dashboard data from backend
-    axios.get('/kpi/dashboard')
-      .then(res => {
-        const payload = res.data;
-        const tasks = payload.tasksCompletedByUserSprint || [];
-        const hours = payload.realHoursByUserSprint || [];
-        setDataTasks(tasks);
-        setDataHours(hours);
-        // derive sprints
-        setSelectedUser('');
-      })
-      .catch(err => {
-        console.error('Failed getting KPI dashboard', err);
-      });
+    const fetchKpis = async () => {
+      try {
+        const res = await fetch('/kpi/dashboard');
+        if (!res.ok) throw new Error('Network response was not ok');
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchKpis();
+    const intervalId = setInterval(fetchKpis, 60000);
+    return () => clearInterval(intervalId);
   }, []);
 
-  const allPoints = useMemo(() => dataTasks.concat(dataHours), [dataTasks, dataHours]);
-  const { sprints: sprintOptions, users: userOptions } = useMemo(() => buildCatalogs(allPoints), [allPoints]);
-  const tasksSummary = useMemo(() => buildSummaryData(dataTasks, dataHours, selectedSprint, selectedUser), [dataTasks, dataHours, selectedSprint, selectedUser]);
-  const tasksChart = useMemo(() => buildStackedChartData(dataTasks, selectedSprint, selectedUser, allPoints), [dataTasks, selectedSprint, selectedUser, allPoints]);
-  const hoursChart = useMemo(() => buildStackedChartData(dataHours, selectedSprint, selectedUser, allPoints), [dataHours, selectedSprint, selectedUser, allPoints]);
+  const buildChartData = (sourceArray, keyField, valField, nameField = null) => {
+    if (!sourceArray) return [];
+    return sourceArray.map(item => ({
+      name: nameField ? item[nameField] : item[keyField],
+      value: item[valField]
+    }));
+  };
 
-  // Metrics
-  const totalHours = tasksSummary.reduce((s,x)=> s + (x.hours||0), 0);
-  const totalTasks = tasksSummary.reduce((s,x)=> s + (x.tasks||0), 0);
-  const devCount = tasksSummary.length || 1;
-  const avgTasksPerDev = devCount ? (totalTasks / devCount) : 0;
-  const avgHoursPerDev = devCount ? (totalHours / devCount) : 0;
+  const tasksByState = useMemo(() => buildChartData(data?.tasksByState, 'estadoNombre', 'totalTareas'), [data]);
+  const tasksByPriority = useMemo(() => buildChartData(data?.tasksByPriority, 'prioridad', 'totalTareas'), [data]);
 
-  // Generate simple insights and actions
-  useEffect(() => {
-    const ins = [];
-    const act = [];
-    if (tasksSummary.length === 0) {
-      ins.push('No data disponible para el sprint seleccionado.');
-    } else {
-  // find top/bottom performers
-  const sortedByTasks = [...tasksSummary].sort((a,b)=> b.tasks - a.tasks);
-      const topTasks = sortedByTasks[0];
-      const lowTasks = sortedByTasks[sortedByTasks.length-1];
-      if (topTasks && lowTasks && (topTasks.tasks - lowTasks.tasks) / Math.max(1, topTasks.tasks) > 0.6) {
-        ins.push(`Variación alta en tareas completadas: ${topTasks.name} completó ${topTasks.tasks} mientras ${lowTasks.name} completó ${lowTasks.tasks}.`);
-        act.push('Revisar asignación de tareas y balancear la carga entre desarrolladores. Considerar tareas cruzadas o pareja (pairing).');
-      }
-      if (avgHoursPerDev > 40) {
-        ins.push(`Promedio de horas por desarrollador es alto (${avgHoursPerDev.toFixed(1)}h).`);
-        act.push('Analizar tareas que consumen muchas horas y verificar estimaciones. Planificar reducción de scope o redistribución.');
-      }
-      // find outliers in hours vs tasks
-      tasksSummary.forEach(d => {
-        if (d.tasks > 0 && (d.hours / d.tasks) > 20) {
-          ins.push(`${d.name} tiene alto ratio horas/tarea (${(d.hours/d.tasks).toFixed(1)}h por task).`);
-          act.push(`Investigar bloqueos o tareas mal estimadas para ${d.name}. Facilitar soporte técnico o clarification de requisitos.`);
-        }
-      });
-      if (ins.length===0) {
-        ins.push('Distribución equilibrada detectada. Buen trabajo equipo.');
-        act.push('Mantener prácticas actuales y monitorizar en próximos sprints.');
-      }
-    }
-    setInsights(ins);
-    setActions(act);
-  }, [selectedSprint, dataTasks, dataHours, avgHoursPerDev, tasksSummary]);
+  const uniqueUsers = useMemo(() => {
+    if (!data) return [];
+    const usersMap = new Map();
+    (data.tasksCompletedByUserSprint || []).forEach(t => usersMap.set(t.userId, t.userNombre));
+    (data.realHoursByUserSprint || []).forEach(h => usersMap.set(h.userId, h.userNombre));
+    return Array.from(usersMap.entries()).map(([id, name]) => ({ id, name: name || `User ${id}` }));
+  }, [data]);
+
+  const uniqueSprints = useMemo(() => {
+    if (!data) return [];
+    const sprintsMap = new Map();
+    (data.tasksCompletedByUserSprint || []).forEach(t => sprintsMap.set(t.sprintId, t.sprintNombre));
+    (data.realHoursByUserSprint || []).forEach(h => sprintsMap.set(h.sprintId, h.sprintNombre));
+    return Array.from(sprintsMap.entries()).map(([id, name]) => ({ id, name: name || `Sprint ${id}` }));
+  }, [data]);
+
+  // Filtered Data for Dev/Sprint Charts
+  const filteredTasksByUser = useMemo(() => {
+    if (!data?.tasksCompletedByUserSprint) return [];
+    const filtered = data.tasksCompletedByUserSprint.filter(t => 
+      (selectedUser === 'ALL' || t.userId === selectedUser) &&
+      (selectedSprint === 'ALL' || t.sprintId === selectedSprint)
+    );
+    // Group by User + Sprint composite name to avoid collisions in chart
+    return filtered.map(t => ({
+      name: `${t.userNombre || 'User'} (${t.sprintNombre || 'Sprint'})`,
+      value: t.totalTareas
+    }));
+  }, [data, selectedUser, selectedSprint]);
+
+  const filteredHoursByUser = useMemo(() => {
+    if (!data?.realHoursByUserSprint) return [];
+    const filtered = data.realHoursByUserSprint.filter(h => 
+      (selectedUser === 'ALL' || h.userId === selectedUser) &&
+      (selectedSprint === 'ALL' || h.sprintId === selectedSprint)
+    );
+    return filtered.map(h => ({
+      name: `${h.userNombre || 'User'} (${h.sprintNombre || 'Sprint'})`,
+      value: h.horasReales || 0
+    }));
+  }, [data, selectedUser, selectedSprint]);
+
+
+  if (loading && !data) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
+        <CircularProgress size={48} thickness={4} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error" sx={{ mt: 4, borderRadius: 2 }}>Error loading KPIs: {error}</Alert>;
+  }
+
+  if (!data) return null;
+
+  const totalTasks = data.tasksByState?.reduce((acc, curr) => acc + curr.totalTareas, 0) || 0;
+  const completedTasks = data.tasksByState?.find(s => s.estadoNombre === 'Done')?.totalTareas || 0;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const totalHours = data.realHoursByUserSprint?.reduce((acc, curr) => acc + (curr.horasReales || 0), 0) || 0;
+
+  const StatCard = ({ title, value, subtitle, icon, valueColor = 'text.primary' }) => (
+    <Card 
+      elevation={0}
+      sx={{ 
+        height: '100%',
+        borderRadius: 3, 
+        background: 'linear-gradient(145deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.2) 100%)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        transition: 'transform 0.2s',
+        '&:hover': { transform: 'translateY(-2px)' }
+      }}
+    >
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" fontWeight="500" gutterBottom>
+              {title}
+            </Typography>
+            <Typography variant="h4" fontWeight="800" color={valueColor} sx={{ my: 1, letterSpacing: '-0.5px' }}>
+              {value}
+            </Typography>
+            {subtitle && (
+               <Typography variant="caption" color="text.disabled">
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ p: 1.5, borderRadius: 2, background: 'rgba(255,255,255,0.03)', display: 'flex' }}>
+            {icon}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <Box sx={{mt:2}}>
-      <Paper sx={{p:2, mb:2}}>
-        <Grid container spacing={2} alignItems="center">
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="h4" fontWeight="800" gutterBottom sx={{ letterSpacing: '-0.5px', mb: 4 }}>
+        Dashboard Analytics
+      </Typography>
+
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Total Tareas" value={totalTasks} icon={<AssignmentTurnedInIcon sx={{ color: 'primary.main', fontSize: 28 }} />} />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Ratio Completado" value={`${completionRate}%`} valueColor={completionRate >= 50 ? 'success.main' : 'error.main'} icon={<SpeedIcon sx={{ color: 'success.main', fontSize: 28 }} />} />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Total Horas Invertidas" value={totalHours.toFixed(1)} subtitle="Global del equipo" icon={<AccessTimeIcon sx={{ color: 'warning.main', fontSize: 28 }} />} />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Eficiencia Global" value={(data?.estimationVsReal?.reduce((acc, curr) => acc + (curr.ratioEficiencia || 100), 0) / (data?.estimationVsReal?.length || 1)).toFixed(1) + '%'} subtitle="Estimadas vs Reales" icon={<TrendingUpIcon sx={{ color: 'info.main', fontSize: 28 }} />} />
+        </Grid>
+      </Grid>
+
+      {/* Global Charts */}
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'background.paper', height: '100%' }}>
+            <Typography variant="h6" fontWeight="600" mb={3} fontSize="1rem">Distribución por Estado</Typography>
+            <Box sx={{ height: 250 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={tasksByState} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                    {tasksByState.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <RechartsTooltip contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#F9FAFB' }} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '0.85rem' }}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={8}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'background.paper', height: '100%' }}>
+            <Typography variant="h6" fontWeight="600" mb={3} fontSize="1rem">Tareas por Prioridad</Typography>
+            <Box sx={{ height: 250 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={tasksByPriority} margin={{ top: 5, right: 30, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                  <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <RechartsTooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#fff', borderRadius: '8px' }} />
+                  <Bar dataKey="value" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Filtered Charts (Dev & Sprint) */}
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'background.paper', mb: 4 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" mb={4} spacing={2}>
+          <Typography variant="h6" fontWeight="600" fontSize="1.1rem">Rendimiento por Desarrollador y Sprint</Typography>
+          <Stack direction="row" spacing={2} minWidth={{ xs: '100%', md: '400px' }}>
+            <FormControl fullWidth variant="filled" size="small" sx={{ '& .MuiFilledInput-root': { borderRadius: 2, '&::before, &::after': { display: 'none' } } }}>
+              <InputLabel>Usuario</InputLabel>
+              <Select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} disableUnderline>
+                <MenuItem value="ALL">Todos los Usuarios</MenuItem>
+                {uniqueUsers.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth variant="filled" size="small" sx={{ '& .MuiFilledInput-root': { borderRadius: 2, '&::before, &::after': { display: 'none' } } }}>
+              <InputLabel>Sprint</InputLabel>
+              <Select value={selectedSprint} onChange={e => setSelectedSprint(e.target.value)} disableUnderline>
+                <MenuItem value="ALL">Todos los Sprints</MenuItem>
+                {uniqueSprints.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Stack>
+        </Stack>
+
+        <Grid container spacing={4}>
           <Grid item xs={12} md={6}>
-            <Typography variant="h6">KPI Dashboard</Typography>
-            <Typography variant="body2" color="textSecondary">Comparativa por usuario / sprint</Typography>
+            <Typography variant="subtitle2" color="text.secondary" mb={2}>Tareas Terminadas (Desarrollador / Sprint)</Typography>
+            <Box sx={{ height: 300 }}>
+              {filteredTasksByUser.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={filteredTasksByUser} margin={{ top: 10, right: 30, left: -20, bottom: 25 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                    <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} angle={-25} textAnchor="end" axisLine={false} tickLine={false} />
+                    <YAxis stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <RechartsTooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#fff', borderRadius: '8px' }} />
+                    <Bar dataKey="value" name="Tareas" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box height="100%" display="flex" alignItems="center" justifyContent="center">
+                  <Typography color="text.disabled">No hay datos para los filtros aplicados</Typography>
+                </Box>
+              )}
+            </Box>
           </Grid>
+
           <Grid item xs={12} md={6}>
-            <Typography variant="body2">Sprint</Typography>
-            <Select value={selectedSprint} onChange={e => setSelectedSprint(e.target.value)} size="small" sx={{mr:1}}>
-              <MenuItem value="">Todos</MenuItem>
-              {sprintOptions.map(s => (
-                <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-              ))}
-            </Select>
-            <Typography variant="body2" sx={{ml:2}}>Usuario</Typography>
-            <Select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} size="small">
-              <MenuItem value="">Todos</MenuItem>
-              {userOptions.map(u => (<MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>))}
-            </Select>
+            <Typography variant="subtitle2" color="text.secondary" mb={2}>Horas Reales (Desarrollador / Sprint)</Typography>
+            <Box sx={{ height: 300 }}>
+              {filteredHoursByUser.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={filteredHoursByUser} margin={{ top: 10, right: 30, left: -20, bottom: 25 }}>
+                    <defs>
+                      <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                    <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} angle={-25} textAnchor="end" axisLine={false} tickLine={false} />
+                    <YAxis stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <RechartsTooltip contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#fff', borderRadius: '8px' }} />
+                    <Area type="monotone" name="Horas" dataKey="value" stroke="#F59E0B" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box height="100%" display="flex" alignItems="center" justifyContent="center">
+                  <Typography color="text.disabled">No hay datos para los filtros aplicados</Typography>
+                </Box>
+              )}
+            </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{p:2, height:420}}>
-            <Typography variant="subtitle1">Tareas completadas por developer por sprint</Typography>
-            <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={tasksChart.chartData} margin={{ top: 40, right: 30, left: 0, bottom: 5 }} barCategoryGap="18%" barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="sprintNombre" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                {renderSeriesWithLabels(tasksChart.usersForChart)}
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{p:2, height:420}}>
-            <Typography variant="subtitle1">Horas reales por developer por sprint</Typography>
-            <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={hoursChart.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }} barCategoryGap="18%" barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="sprintNombre" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                {renderSeries(hoursChart.usersForChart)}
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{p:2}}>
-            <Typography variant="subtitle2">Métricas</Typography>
-            <Typography>#Horas Reales: <strong>{totalHours.toFixed(1)}</strong></Typography>
-            <Typography>#Promedio Tasks/Developer: <strong>{avgTasksPerDev.toFixed(2)}</strong></Typography>
-            <Typography>#Promedio Horas/Developer: <strong>{avgHoursPerDev.toFixed(2)}</strong></Typography>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{p:2}}>
-            <Typography variant="subtitle2">Hallazgos</Typography>
-            {insights.length===0 ? <Typography>No hay hallazgos.</Typography> : (
-              <ul>
-                {insights.map((i,idx) => <li key={idx}><Typography variant="body2">{i}</Typography></li>)}
-              </ul>
-            )}
-
-            <Typography variant="subtitle2" sx={{mt:1}}>Acciones de mejora</Typography>
-            {actions.length===0 ? <Typography>No se proponen acciones.</Typography> : (
-              <ul>
-                {actions.map((a,idx) => <li key={idx}><Typography variant="body2">{a}</Typography></li>)}
-              </ul>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
     </Box>
   );
 }
-
-export default KpiDashboard;
