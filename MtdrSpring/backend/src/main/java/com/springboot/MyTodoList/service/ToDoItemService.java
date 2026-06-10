@@ -20,58 +20,79 @@ public class ToDoItemService {
     @Autowired
     private ToDoItemRepository toDoItemRepository;
 
-    public List<ToDoItem> findAll(){
-        List<ToDoItem> todoItems = toDoItemRepository.findAllByOrderByIDDesc();
-        return todoItems;
+    // ← NUEVO: inyección de TaskSuggestionService para mantener embeddings actualizados
+    @Autowired
+    private TaskSuggestionService taskSuggestionService;
+
+    public List<ToDoItem> findAll() {
+        return toDoItemRepository.findAllByOrderByIDDesc();
     }
 
-    public ResponseEntity<ToDoItem> getItemById(int id){
+    public ResponseEntity<ToDoItem> getItemById(int id) {
         Optional<ToDoItem> todoData = toDoItemRepository.findById(id);
-        if (todoData.isPresent()){
+        if (todoData.isPresent()) {
             return new ResponseEntity<>(todoData.get(), HttpStatus.OK);
-        }else{
+        } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
-    public ToDoItem getToDoItemById(int id){
+    public ToDoItem getToDoItemById(int id) {
         Optional<ToDoItem> todoData = toDoItemRepository.findById(id);
-        if (todoData.isPresent()){
-            return todoData.get();
-        }else{
-            return null;
-        }
+        return todoData.orElse(null);
     }
 
-    
-    public ToDoItem addToDoItem(ToDoItem toDoItem){
+    public ToDoItem addToDoItem(ToDoItem toDoItem) {
         prepareTaskDefaults(toDoItem);
         if (toDoItem.getID() == null) {
             toDoItem.setID(nextTaskId());
         }
-        return toDoItemRepository.save(toDoItem);
+        ToDoItem saved = toDoItemRepository.save(toDoItem);
+
+        // ← NUEVO: vectoriza la tarea recién creada (no bloquea si falla)
+        taskSuggestionService.vectorizeTarea(
+                saved.getID(),
+                saved.getTitulo(),
+                saved.getDescripcion(),
+                saved.getPrioridad()
+        );
+
+        return saved;
     }
 
-    public boolean deleteToDoItem(int id){
-        try{
+    public boolean deleteToDoItem(int id) {
+        try {
             toDoItemRepository.deleteById(id);
             return true;
-        }catch(Exception e){
+        } catch (Exception e) {
             return false;
         }
     }
-    public ToDoItem updateToDoItem(int id, ToDoItem td){
+
+    public ToDoItem updateToDoItem(int id, ToDoItem td) {
         Optional<ToDoItem> toDoItemData = toDoItemRepository.findById(id);
-        if(toDoItemData.isPresent()){
+        if (toDoItemData.isPresent()) {
             ToDoItem toDoItem = toDoItemData.get();
             toDoItem.setID(id);
             mergeTask(toDoItem, td);
             prepareTaskDefaults(toDoItem);
-            return toDoItemRepository.save(toDoItem);
-        }else{
+            ToDoItem saved = toDoItemRepository.save(toDoItem);
+
+            // ← NUEVO: re-vectoriza si cambió título, descripción o prioridad
+            taskSuggestionService.vectorizeTarea(
+                    saved.getID(),
+                    saved.getTitulo(),
+                    saved.getDescripcion(),
+                    saved.getPrioridad()
+            );
+
+            return saved;
+        } else {
             return null;
         }
     }
+
+    // ─── métodos privados sin cambios ──────────────────────────────────────
 
     private void prepareTaskDefaults(ToDoItem task) {
         if ((task.getTitulo() == null || task.getTitulo().isBlank()) && task.getDescription() != null) {
@@ -80,7 +101,6 @@ public class ToDoItemService {
         if (task.getCreation_ts() == null) {
             task.setCreation_ts(LocalDate.now());
         }
-        // Current product scope uses a single project only.
         task.setIdProyecto(DEFAULT_PROJECT_ID);
         if (task.getIdEstado() == null) {
             task.setIdEstado(ESTADO_TODO);
@@ -122,7 +142,6 @@ public class ToDoItemService {
         if (incoming.getIdEstado() != null) {
             current.setIdEstado(incoming.getIdEstado());
         }
-        // ID_PROYECTO is fixed to DEFAULT_PROJECT_ID in this stage.
         current.setIdProyecto(DEFAULT_PROJECT_ID);
         if (incoming.getIdSprint() != null) {
             current.setIdSprint(incoming.getIdSprint());
@@ -139,5 +158,4 @@ public class ToDoItemService {
         }
         return tasks.get(0).getID() + 1;
     }
-
 }
