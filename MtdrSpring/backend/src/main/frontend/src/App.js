@@ -15,9 +15,11 @@ import NewItem from './NewItem';
 import API from './API';
 import KpiDashboard from './KpiDashboard';
 import AiPlanner from './AiPlanner';
+import AuthPage from './AuthPage';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
+import LogoutIcon from '@mui/icons-material/Logout';
 import {
   AppBar,
   Toolbar,
@@ -44,6 +46,8 @@ import Moment from 'react-moment';
  * one with the items that are already done.
  */
 function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [viewMode, setViewMode] = useState('tasks');
   const [isLoading, setLoading] = useState(false);
   const [isInserting, setInserting] = useState(false);
@@ -51,6 +55,34 @@ function App() {
   const [error, setError] = useState();
 
   const errorMessage = typeof error === 'string' ? error : error?.message;
+
+  useEffect(() => {
+    API.checkAuth().then((user) => {
+      setCurrentUser(user);
+      setAuthChecked(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setLoading(true);
+    API.list().then(
+      (result) => { setLoading(false); setItems(result); },
+      (err) => { setLoading(false); setError(err); }
+    );
+  }, [currentUser]);
+
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    setAuthChecked(true);
+  };
+
+  const handleLogout = async () => {
+    await API.logout();
+    setCurrentUser(null);
+    setItems([]);
+    setViewMode('tasks');
+  };
 
   function deleteItem(deleteId) {
     API.remove(deleteId).then(
@@ -89,14 +121,6 @@ function App() {
     return API.update(id, data);
   }
 
-  useEffect(() => {
-    setLoading(true);
-    API.list().then(
-      (result) => { setLoading(false); setItems(result); },
-      (err) => { setLoading(false); setError(err); }
-    );
-  }, []);
-
   function addItem(payload) {
     console.log(`addItem(${JSON.stringify(payload)})`);
     setInserting(true);
@@ -132,6 +156,18 @@ function App() {
     );
   }
 
+  if (!authChecked) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!currentUser) {
+    return <AuthPage onLogin={handleLogin} />;
+  }
+
   return (
     <div className="App">
       <AppBar
@@ -144,7 +180,10 @@ function App() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="appbar-title">
             Oracle Project Admin
           </Typography>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2" sx={{ mr: 1 }}>
+              {currentUser.nombre}
+            </Typography>
             <Button
               color="inherit"
               variant={viewMode === 'tasks' ? 'outlined' : 'text'}
@@ -159,6 +198,9 @@ function App() {
             >
               IA
             </Button>
+            <IconButton color="inherit" onClick={handleLogout} title="Cerrar sesi\u00f3n">
+              <LogoutIcon />
+            </IconButton>
           </Stack>
         </Toolbar>
       </AppBar>

@@ -45,6 +45,15 @@ const mockGeneratePlan = async (payload) => {
 };
 
 const API = {
+	checkAuth: async () => {
+		const res = await fetch('/auth/me', { credentials: 'include' });
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.success ? data.user : null;
+	},
+	logout: async () => {
+		await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+	},
 	list: async () => {
 		if (useMock) {
 			await sleep(200);
