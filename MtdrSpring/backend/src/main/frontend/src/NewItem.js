@@ -30,16 +30,14 @@ function NewItem(props) {
     let mounted = true;
     const fetchData = async () => {
       try {
-        const ures = await fetch('/users');
+        const ures = await fetch('/api/users');
         if (ures.ok) {
           const udata = await ures.json();
           if (Array.isArray(udata) && udata.length > 0) {
-            const mapped = udata.map(u => {
-              const id = u.id ?? u.ID ?? u.Id ?? u.Id;
-              const phone = u.phoneNumber ?? u.phonenumber ?? null;
-              const name = u.name ?? u.nombre ?? u.userNombre ?? u.userName ?? phone ?? (id != null ? `User ${id}` : 'User');
-              return { id, name, raw: u };
-            });
+            const mapped = udata.map(u => ({
+              id: u.id,
+              name: u.nombre
+            }));
             if (!mounted) return;
             setUsers(mapped);
             if (mapped.length > 0 && !idUsuario) setIdUsuario(mapped[0].id);
@@ -63,45 +61,6 @@ function NewItem(props) {
         }
       } catch (e) {
         console.error('Failed fetching sprints for NewItem', e);
-      }
-
-      try {
-        const kres = await fetch('/kpi/dashboard');
-        if (kres.ok) {
-          const payload = await kres.json();
-          const tasks = payload.tasksCompletedByUserSprint || [];
-          const hours = payload.realHoursByUserSprint || [];
-
-          if (sprints == null || sprints.length === 0) {
-            const sprintMap = new Map();
-            tasks.concat(hours).forEach(p => {
-              if (p && (p.sprintId != null || p.sprintId === 0)) {
-                sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
-              }
-            });
-            const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
-            if (mounted) {
-              setSprints(sList);
-              if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
-            }
-          }
-
-          if ((users == null || users.length === 0)) {
-            const userMap = new Map();
-            tasks.concat(hours).forEach(p => {
-              if (p && (p.userId != null || p.userId === 0)) {
-                userMap.set(p.userId, p.userNombre || `User ${p.userId}`);
-              }
-            });
-            const uList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
-            if (mounted && uList.length > 0) {
-              setUsers(uList);
-              if (!idUsuario) setIdUsuario(uList[0].id);
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed fetching KPI dashboard for NewItem', e);
       }
     };
     fetchData();

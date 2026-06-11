@@ -5,6 +5,7 @@ import KpiDashboard from './KpiDashboard';
 import AiPlanner from './AiPlanner';
 import AuthPage from './AuthPage';
 import EditTaskModal from './EditTaskModal';
+import SettingsPage from './SettingsPage';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
@@ -16,6 +17,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import SettingsIcon from '@mui/icons-material/Settings';
 import {
   AppBar,
   Toolbar,
@@ -34,7 +36,12 @@ import {
   Fade,
   Alert,
   Chip,
-  Collapse
+  Collapse,
+  Avatar,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import Moment from 'react-moment';
 
@@ -50,8 +57,33 @@ function App() {
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [expandedSprints, setExpandedSprints] = useState({});
+  const [anchorEl, setAnchorEl] = useState(null);
+  const menuOpen = Boolean(anchorEl);
 
   const errorMessage = typeof error === 'string' ? error : error?.message;
+
+  const fetchSprints = async () => {
+    try {
+      const sres = await fetch('/sprints');
+      if (sres.ok) {
+        const sdata = await sres.json();
+        if (Array.isArray(sdata)) {
+          const sList = sdata.map(s => ({
+            id: s.idSprint,
+            name: s.nombre,
+            fechaInicio: s.fechaInicio,
+            fechaFin: s.fechaFin
+          }));
+          setSprints(sList);
+          const initialExpanded = {};
+          sList.forEach(s => { initialExpanded[s.id] = true; });
+          setExpandedSprints(initialExpanded);
+        }
+      }
+    } catch (e) {
+      console.error('Failed fetching sprints', e);
+    }
+  };
 
   useEffect(() => {
     API.checkAuth().then((user) => {
@@ -73,16 +105,16 @@ function App() {
     if (!currentUser) return;
     const fetchAll = async () => {
       try {
-        const ures = await fetch('/users');
+        const ures = await fetch('/api/users');
         if (ures.ok) {
           const udata = await ures.json();
           if (Array.isArray(udata) && udata.length > 0) {
-            const mapped = udata.map(u => {
-              const id = u.id ?? u.ID ?? u.Id;
-              const phone = u.phoneNumber ?? u.phonenumber ?? null;
-              const name = u.name ?? u.nombre ?? u.userNombre ?? u.userName ?? phone ?? (id != null ? `User ${id}` : 'User');
-              return { id, name, raw: u };
-            });
+            const mapped = udata.map(u => ({
+              id: u.id,
+              name: u.nombre,
+              email: u.email,
+              raw: u
+            }));
             setUsers(mapped);
           }
         }
@@ -90,26 +122,7 @@ function App() {
         console.error('Failed fetching users', e);
       }
 
-      try {
-        const sres = await fetch('/sprints');
-        if (sres.ok) {
-          const sdata = await sres.json();
-          if (Array.isArray(sdata)) {
-            const sList = sdata.map(s => ({
-              id: s.idSprint,
-              name: s.nombre,
-              fechaInicio: s.fechaInicio,
-              fechaFin: s.fechaFin
-            }));
-            setSprints(sList);
-            const initialExpanded = {};
-            sList.forEach(s => { initialExpanded[s.id] = true; });
-            setExpandedSprints(initialExpanded);
-          }
-        }
-      } catch (e) {
-        console.error('Failed fetching sprints', e);
-      }
+      await fetchSprints();
     };
     fetchAll();
   }, [currentUser]);
@@ -157,10 +170,24 @@ function App() {
   };
 
   const handleLogout = async () => {
+    setAnchorEl(null);
     await API.logout();
     setCurrentUser(null);
     setItems([]);
     setViewMode('tasks');
+  };
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleGoToSettings = () => {
+    setAnchorEl(null);
+    setViewMode('settings');
   };
 
   function deleteItem(deleteId) {
@@ -274,14 +301,57 @@ function App() {
             >
               Control AI
             </Button>
-
-            <Typography variant="body2" sx={{ ml: 1, mr: 1, color: 'text.secondary' }}>
-              {currentUser?.nombre}
-            </Typography>
-            <IconButton color="inherit" onClick={handleLogout} title="Cerrar sesion">
-              <LogoutIcon />
-            </IconButton>
           </Stack>
+
+          <Box>
+            <IconButton onClick={handleMenuOpen} size="small" sx={{ p: 0 }}>
+              <Avatar
+                sx={{
+                  bgcolor: 'primary.main',
+                  width: 36,
+                  height: 36,
+                  fontSize: '0.9rem',
+                  fontWeight: 600
+                }}
+              >
+                {currentUser?.nombre ? currentUser.nombre.charAt(0).toUpperCase() : 'U'}
+              </Avatar>
+            </IconButton>
+            <Menu
+              anchorEl={anchorEl}
+              open={menuOpen}
+              onClose={handleMenuClose}
+              PaperProps={{
+                sx: {
+                  mt: 1,
+                  bgcolor: 'rgba(17, 24, 39, 0.95)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 2,
+                  minWidth: 200,
+                  backdropFilter: 'blur(12px)'
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={handleGoToSettings} sx={{ py: 1.5, px: 2 }}>
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                </ListItemIcon>
+                <ListItemText>
+                  <Typography variant="body2">Configuracion</Typography>
+                </ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleLogout} sx={{ py: 1.5, px: 2 }}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" sx={{ color: 'error.main' }} />
+                </ListItemIcon>
+                <ListItemText>
+                  <Typography variant="body2" color="error">Cerrar sesion</Typography>
+                </ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -509,6 +579,12 @@ function App() {
               <Box mt={8}>
                 <KpiDashboard />
               </Box>
+            </Box>
+          </Fade>
+        ) : viewMode === 'settings' ? (
+          <Fade in timeout={500}>
+            <Box sx={{ flex: 1 }}>
+              <SettingsPage onBack={() => setViewMode('tasks')} users={users} sprints={sprints} onSprintsChange={fetchSprints} />
             </Box>
           </Fade>
         ) : (
