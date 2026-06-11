@@ -5,12 +5,14 @@ import API from './API';
 import KpiDashboard from './KpiDashboard';
 import AiPlanner from './AiPlanner';
 import AuthPage from './AuthPage';
-import LogoutIcon from '@mui/icons-material/Logout';
+import EditTaskModal from './EditTaskModal';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import EditIcon from '@mui/icons-material/Edit';
+import LogoutIcon from '@mui/icons-material/Logout';
 import {
   AppBar,
   Toolbar,
@@ -40,6 +42,9 @@ function App() {
   const [isInserting, setInserting] = useState(false);
   const [items, setItems] = useState([]);
   const [error, setError] = useState();
+  const [editingTask, setEditingTask] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [sprints, setSprints] = useState([]);
 
   const errorMessage = typeof error === 'string' ? error : error?.message;
 
@@ -57,6 +62,61 @@ function App() {
       (result) => { setLoading(false); setItems(result); },
       (err) => { setLoading(false); setError(err); }
     );
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchUsersAndSprints = async () => {
+      try {
+        const ures = await fetch('/users');
+        if (ures.ok) {
+          const udata = await ures.json();
+          if (Array.isArray(udata) && udata.length > 0) {
+            const mapped = udata.map(u => {
+              const id = u.id ?? u.ID ?? u.Id ?? u.Id;
+              const phone = u.phoneNumber ?? u.phonenumber ?? null;
+              const name = u.name ?? u.nombre ?? u.userNombre ?? u.userName ?? phone ?? (id != null ? `User ${id}` : 'User');
+              return { id, name, raw: u };
+            });
+            setUsers(mapped);
+          }
+        }
+      } catch (e) {
+        console.error('Failed fetching users', e);
+      }
+
+      try {
+        const kres = await fetch('/kpi/dashboard');
+        if (kres.ok) {
+          const payload = await kres.json();
+          const tasks = payload.tasksCompletedByUserSprint || [];
+          const hours = payload.realHoursByUserSprint || [];
+
+          const sprintMap = new Map();
+          tasks.concat(hours).forEach(p => {
+            if (p && (p.sprintId != null || p.sprintId === 0)) {
+              sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
+            }
+          });
+          const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
+          setSprints(sList);
+
+          if (!users || users.length === 0) {
+            const userMap = new Map();
+            tasks.concat(hours).forEach(p => {
+              if (p && (p.userId != null || p.userId === 0)) {
+                userMap.set(p.userId, p.userNombre || `User ${p.userId}`);
+              }
+            });
+            const uList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
+            setUsers(uList);
+          }
+        }
+      } catch (e) {
+        console.error('Failed fetching KPI dashboard', e);
+      }
+    };
+    fetchUsersAndSprints();
   }, [currentUser]);
 
   const handleLogin = (user) => {
@@ -106,6 +166,14 @@ function App() {
   function modifyItem(id, description, done) {
     const data = { description, done };
     return API.update(id, data);
+  }
+
+  async function handleEditTask(id, payload) {
+    await API.update(id, payload);
+    const updated = await API.get(id);
+    setItems((previousItems) => previousItems.map(
+      (item) => (item.id === id ? { ...item, ...updated } : item)
+    ));
   }
 
   function addItem(payload) {
@@ -313,6 +381,14 @@ function App() {
                         <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
                           <IconButton
                             size="small"
+                            color="primary"
+                            onClick={() => setEditingTask(item)}
+                            title="Editar tarea"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
                             color={item.done ? 'default' : 'success'}
                             onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}
                           >
@@ -345,6 +421,15 @@ function App() {
           </Fade>
         )}
       </Container>
+
+      <EditTaskModal
+        open={!!editingTask}
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleEditTask}
+        users={users}
+        sprints={sprints}
+      />
     </Box>
   );
 }
