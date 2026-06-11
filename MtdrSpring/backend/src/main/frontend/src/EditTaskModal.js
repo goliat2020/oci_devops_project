@@ -27,7 +27,9 @@ function EditTaskModal({ open, task, onClose, onSave, users, sprints }) {
     horasReales: '',
     idUsuario: '',
     idSprint: '',
-    idEstado: 1
+    idEstado: 1,
+    fechaFinEstimada: '',
+    fechaFinReal: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +43,9 @@ function EditTaskModal({ open, task, onClose, onSave, users, sprints }) {
         horasReales: task.horasReales != null ? task.horasReales : '',
         idUsuario: task.idUsuario != null ? task.idUsuario : '',
         idSprint: task.idSprint != null ? task.idSprint : '',
-        idEstado: task.idEstado || 1
+        idEstado: task.idEstado || 1,
+        fechaFinEstimada: task.fechaFinEstimada || '',
+        fechaFinReal: task.fechaFinReal || ''
       });
     }
   }, [task]);
@@ -61,7 +65,9 @@ function EditTaskModal({ open, task, onClose, onSave, users, sprints }) {
         horasReales: formData.horasReales === '' ? null : Number(formData.horasReales),
         idUsuario: formData.idUsuario === '' ? null : Number(formData.idUsuario),
         idSprint: formData.idSprint === '' ? null : Number(formData.idSprint),
-        idEstado: Number(formData.idEstado)
+        idEstado: Number(formData.idEstado),
+        fechaFinEstimada: formData.fechaFinEstimada || null,
+        fechaFinReal: formData.fechaFinReal || null
       };
       await onSave(task.id, payload);
       onClose();
@@ -155,7 +161,31 @@ function EditTaskModal({ open, task, onClose, onSave, users, sprints }) {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={6}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Fecha Fin Estimada"
+                type="date"
+                value={formData.fechaFinEstimada}
+                onChange={handleChange('fechaFinEstimada')}
+                variant="outlined"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Fecha Fin Real"
+                type="date"
+                value={formData.fechaFinReal}
+                onChange={handleChange('fechaFinReal')}
+                variant="outlined"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth variant="outlined">
                 <InputLabel>Asignar Usuario</InputLabel>
                 <Select
@@ -171,7 +201,7 @@ function EditTaskModal({ open, task, onClose, onSave, users, sprints }) {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={6}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth variant="outlined">
                 <InputLabel>Sprint</InputLabel>
                 <Select

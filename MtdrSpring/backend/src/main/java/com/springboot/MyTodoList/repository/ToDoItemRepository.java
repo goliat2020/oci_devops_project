@@ -19,6 +19,40 @@ public interface ToDoItemRepository extends JpaRepository<ToDoItem,Integer> {
 
 		List<ToDoItem> findAllByOrderByIDDesc();
 
+		@Query(value = "SELECT " +
+			"et.NOMBRE AS name, " +
+			"COUNT(*) AS totalTareas " +
+			"FROM TAREA t " +
+			"JOIN ESTADO_TAREA et ON et.ID_ESTADO = t.ID_ESTADO " +
+			"WHERE t.ID_PROYECTO = 1 " +
+			"AND (:sprintId IS NULL OR t.ID_SPRINT = :sprintId) " +
+			"GROUP BY et.NOMBRE " +
+			"ORDER BY totalTareas DESC", nativeQuery = true)
+		List<KpiCountProjection> findTasksByState(@Param("sprintId") Integer sprintId);
+
+		@Query(value = "SELECT " +
+			"NVL(PRIORIDAD, 'SIN_PRIORIDAD') AS name, " +
+			"COUNT(*) AS totalTareas " +
+			"FROM TAREA t " +
+			"WHERE t.ID_PROYECTO = 1 " +
+			"AND (:sprintId IS NULL OR t.ID_SPRINT = :sprintId) " +
+			"GROUP BY PRIORIDAD " +
+			"ORDER BY totalTareas DESC", nativeQuery = true)
+		List<KpiCountProjection> findTasksByPriority(@Param("sprintId") Integer sprintId);
+
+		@Query(value = "SELECT " +
+			"t.ID_SPRINT AS sprintId, " +
+			"s.NOMBRE AS sprintNombre, " +
+			"NVL(SUM(t.ESTIMACION_HORAS), 0) AS horasEstimadas, " +
+			"NVL(SUM(t.HORAS_REALES), 0) AS horasReales " +
+			"FROM TAREA t " +
+			"LEFT JOIN SPRINT s ON s.ID_SPRINT = t.ID_SPRINT " +
+			"WHERE t.ID_PROYECTO = 1 " +
+			"AND (:sprintId IS NULL OR t.ID_SPRINT = :sprintId) " +
+			"GROUP BY t.ID_SPRINT, s.NOMBRE " +
+			"ORDER BY t.ID_SPRINT", nativeQuery = true)
+		List<KpiEstimationProjection> findEstimationVsReal(@Param("sprintId") Integer sprintId);
+
 		    @Query(value = "SELECT " +
 			    "t.ID_SPRINT AS sprintId, " +
 			    "s.NOMBRE AS sprintNombre, " +

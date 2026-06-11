@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import NewItem from './NewItem';
 import API from './API';
 import KpiDashboard from './KpiDashboard';
@@ -13,6 +12,10 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
   AppBar,
   Toolbar,
@@ -30,7 +33,8 @@ import {
   Stack,
   Fade,
   Alert,
-  Chip
+  Chip,
+  Collapse
 } from '@mui/material';
 import Moment from 'react-moment';
 
@@ -45,6 +49,7 @@ function App() {
   const [editingTask, setEditingTask] = useState(null);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
+  const [expandedSprints, setExpandedSprints] = useState({});
 
   const errorMessage = typeof error === 'string' ? error : error?.message;
 
@@ -66,14 +71,14 @@ function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    const fetchUsersAndSprints = async () => {
+    const fetchAll = async () => {
       try {
         const ures = await fetch('/users');
         if (ures.ok) {
           const udata = await ures.json();
           if (Array.isArray(udata) && udata.length > 0) {
             const mapped = udata.map(u => {
-              const id = u.id ?? u.ID ?? u.Id ?? u.Id;
+              const id = u.id ?? u.ID ?? u.Id;
               const phone = u.phoneNumber ?? u.phonenumber ?? null;
               const name = u.name ?? u.nombre ?? u.userNombre ?? u.userName ?? phone ?? (id != null ? `User ${id}` : 'User');
               return { id, name, raw: u };
@@ -86,38 +91,65 @@ function App() {
       }
 
       try {
-        const kres = await fetch('/kpi/dashboard');
-        if (kres.ok) {
-          const payload = await kres.json();
-          const tasks = payload.tasksCompletedByUserSprint || [];
-          const hours = payload.realHoursByUserSprint || [];
-
-          const sprintMap = new Map();
-          tasks.concat(hours).forEach(p => {
-            if (p && (p.sprintId != null || p.sprintId === 0)) {
-              sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
-            }
-          });
-          const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
-          setSprints(sList);
-
-          if (!users || users.length === 0) {
-            const userMap = new Map();
-            tasks.concat(hours).forEach(p => {
-              if (p && (p.userId != null || p.userId === 0)) {
-                userMap.set(p.userId, p.userNombre || `User ${p.userId}`);
-              }
-            });
-            const uList = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
-            setUsers(uList);
+        const sres = await fetch('/sprints');
+        if (sres.ok) {
+          const sdata = await sres.json();
+          if (Array.isArray(sdata)) {
+            const sList = sdata.map(s => ({
+              id: s.idSprint,
+              name: s.nombre,
+              fechaInicio: s.fechaInicio,
+              fechaFin: s.fechaFin
+            }));
+            setSprints(sList);
+            const initialExpanded = {};
+            sList.forEach(s => { initialExpanded[s.id] = true; });
+            setExpandedSprints(initialExpanded);
           }
         }
       } catch (e) {
-        console.error('Failed fetching KPI dashboard', e);
+        console.error('Failed fetching sprints', e);
       }
     };
-    fetchUsersAndSprints();
+    fetchAll();
   }, [currentUser]);
+
+  const sprintGroups = useMemo(() => {
+    const sprintMap = new Map();
+    const noSprintKey = '__no_sprint__';
+
+    items.forEach(item => {
+      const key = item.idSprint != null ? item.idSprint : noSprintKey;
+      if (!sprintMap.has(key)) {
+        sprintMap.set(key, []);
+      }
+      sprintMap.get(key).push(item);
+    });
+
+    const sprintOrder = new Map();
+    sprints.forEach((s, idx) => {
+      sprintOrder.set(s.id, idx);
+    });
+
+    const groups = Array.from(sprintMap.entries()).map(([sprintId, tasks]) => {
+      const sprintInfo = sprints.find(s => s.id === sprintId);
+      return {
+        sprintId,
+        sprintName: sprintInfo ? sprintInfo.name : 'Sin Sprint',
+        fechaInicio: sprintInfo ? sprintInfo.fechaInicio : null,
+        fechaFin: sprintInfo ? sprintInfo.fechaFin : null,
+        tasks,
+        order: sprintOrder.has(sprintId) ? sprintOrder.get(sprintId) : 9999
+      };
+    });
+
+    groups.sort((a, b) => a.order - b.order);
+    return groups;
+  }, [items, sprints]);
+
+  const toggleSprint = (sprintId) => {
+    setExpandedSprints(prev => ({ ...prev, [sprintId]: !prev[sprintId] }));
+  };
 
   const handleLogin = (user) => {
     setCurrentUser(user);
@@ -142,30 +174,17 @@ function App() {
 
   function toggleDone(event, id, description, done) {
     event.preventDefault();
-    modifyItem(id, description, done).then(
-      () => { reloadOneIteam(id); },
-      (err) => { setError(err); }
-    );
-  }
-
-  function reloadOneIteam(id) {
-    API.get(id).then(
-      (result) => {
-        setItems((previousItems) => previousItems.map(
-          (item) => (item.id === id ? {
-            ...item,
-            description: result.description,
-            done: result.done
-          } : item)
-        ));
+    const data = { description, done };
+    API.update(id, data).then(
+      () => {
+        API.get(id).then((result) => {
+          setItems((previousItems) => previousItems.map(
+            (item) => (item.id === id ? { ...item, ...result } : item)
+          ));
+        });
       },
       (err) => { setError(err); }
     );
-  }
-
-  function modifyItem(id, description, done) {
-    const data = { description, done };
-    return API.update(id, data);
   }
 
   async function handleEditTask(id, payload) {
@@ -178,30 +197,18 @@ function App() {
 
   function addItem(payload) {
     setInserting(true);
-    let data;
-    let displayDescription = '';
-
-    if (typeof payload === 'string') {
-      data = { description: payload };
-      displayDescription = payload;
-    } else if (typeof payload === 'object') {
-      data = payload;
-      displayDescription = payload.descripcion || payload.titulo || payload.description || '';
-    } else {
-      data = { description: String(payload) };
-      displayDescription = String(payload);
-    }
+    const data = typeof payload === 'object' ? payload : { description: String(payload) };
 
     API.create(data).then(
       (result) => {
         let newItem;
         if (result && result.headers && typeof result.headers.get === 'function') {
           const id = result.headers.get('location');
-          newItem = { id, ...data, description: displayDescription };
+          newItem = { id, ...data };
         } else if (result && result.id) {
           newItem = result;
         } else {
-          newItem = { id: String(Date.now()), ...data, description: displayDescription };
+          newItem = { id: String(Date.now()), ...data };
         }
         setItems((previousItems) => [newItem, ...previousItems]);
         setInserting(false);
@@ -224,7 +231,6 @@ function App() {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Sleek Navbar */}
       <AppBar
         position="sticky"
         elevation={0}
@@ -269,11 +275,10 @@ function App() {
               Control AI
             </Button>
 
-            {/* show current user name and logout */}
             <Typography variant="body2" sx={{ ml: 1, mr: 1, color: 'text.secondary' }}>
               {currentUser?.nombre}
             </Typography>
-            <IconButton color="inherit" onClick={handleLogout} title="Cerrar sesi\u00f3n">
+            <IconButton color="inherit" onClick={handleLogout} title="Cerrar sesion">
               <LogoutIcon />
             </IconButton>
           </Stack>
@@ -284,17 +289,15 @@ function App() {
         {viewMode === 'tasks' ? (
           <Fade in timeout={500}>
             <Box>
-              {/* Header area */}
               <Box mb={5}>
                 <Typography variant="h3" fontWeight="800" gutterBottom sx={{ letterSpacing: '-1px' }}>
                   Mis Proyectos
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
-                  Gestiona tus tareas y sprints con la máxima eficiencia.
+                  Gestiona tus tareas y sprints con la maxima eficiencia.
                 </Typography>
               </Box>
 
-              {/* Input section */}
               <Paper 
                 elevation={0}
                 sx={{ 
@@ -312,7 +315,6 @@ function App() {
                 <Alert severity="error" sx={{ mb: 4, borderRadius: 2 }}>{errorMessage}</Alert>
               )}
 
-              {/* Loading & Empty States */}
               {isLoading && (
                 <Box display="flex" justifyContent="center" p={6}>
                   <CircularProgress size={40} thickness={4} />
@@ -330,83 +332,179 @@ function App() {
                 </Paper>
               )}
 
-              {/* Grid of Tasks */}
-              <Grid container spacing={3}>
-                {items.map((item, index) => (
-                  <Grid item xs={12} sm={6} md={4} key={item.id}>
-                    <Fade in timeout={300 + (index * 100)}>
-                      <Card 
-                        elevation={0}
-                        sx={{ 
-                          height: '100%', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          borderRadius: 3,
-                          transition: 'all 0.2s ease',
-                          opacity: item.done ? 0.6 : 1,
-                          border: item.done ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(255,255,255,0.08)',
-                          '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: '0 12px 24px -10px rgba(0,0,0,0.5)',
-                            borderColor: item.done ? 'rgba(255,255,255,0.02)' : 'primary.main',
-                            opacity: 1
-                          }
-                        }}
-                      >
-                        <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                            <Chip 
-                              label={item.done ? "Completado" : "Pendiente"} 
-                              size="small"
-                              variant={item.done ? "outlined" : "filled"}
-                              color={item.done ? "default" : "primary"}
-                              sx={{ fontWeight: 600, fontSize: '0.75rem', height: 24 }}
-                            />
-                            <Typography variant="caption" color="text.disabled">
-                              <Moment format="MMM Do, YYYY">{item.createdAt}</Moment>
-                            </Typography>
-                          </Stack>
-                          <Typography 
-                            variant="body1" 
-                            fontWeight="500" 
-                            sx={{ 
-                              textDecoration: item.done ? 'line-through' : 'none',
-                              color: item.done ? 'text.secondary' : 'text.primary',
-                              lineHeight: 1.6
-                            }}
-                          >
-                            {item.description}
+              {sprintGroups.map((group) => (
+                <Box key={group.sprintId} sx={{ mb: 4 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      borderRadius: 3,
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.02)',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <Box
+                      onClick={() => toggleSprint(group.sprintId)}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        px: 3,
+                        py: 2,
+                        cursor: 'pointer',
+                        '&:hover': { background: 'rgba(255,255,255,0.03)' },
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px' }}>
+                          {group.sprintName}
+                        </Typography>
+                        <Chip
+                          label={`${group.tasks.length} tarea${group.tasks.length !== 1 ? 's' : ''}`}
+                          size="small"
+                          sx={{ fontWeight: 600, fontSize: '0.75rem', height: 24 }}
+                        />
+                        {group.fechaInicio && group.fechaFin && (
+                          <Typography variant="caption" color="text.disabled">
+                            <Moment format="MMM D">{group.fechaInicio}</Moment>
+                            {' - '}
+                            <Moment format="MMM D, YYYY">{group.fechaFin}</Moment>
                           </Typography>
-                        </CardContent>
-                        <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => setEditingTask(item)}
-                            title="Editar tarea"
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color={item.done ? 'default' : 'success'}
-                            onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}
-                          >
-                            {item.done ? <UndoIcon fontSize="small" /> : <CheckCircleOutlineIcon fontSize="small" />}
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            color="error" 
-                            onClick={() => deleteItem(item.id)}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </CardActions>
-                      </Card>
-                    </Fade>
-                  </Grid>
-                ))}
-              </Grid>
+                        )}
+                      </Stack>
+                      <IconButton size="small">
+                        {expandedSprints[group.sprintId] !== false ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </Box>
+
+                    <Collapse in={expandedSprints[group.sprintId] !== false} timeout="auto">
+                      <Box sx={{ px: 3, pb: 3 }}>
+                        <Grid container spacing={3} sx={{ mt: 1 }}>
+                          {group.tasks.map((item, index) => (
+                            <Grid item xs={12} sm={6} md={4} key={item.id}>
+                              <Fade in timeout={300 + (index * 80)}>
+                                <Card 
+                                  elevation={0}
+                                  sx={{ 
+                                    height: '100%', 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    borderRadius: 3,
+                                    transition: 'all 0.2s ease',
+                                    opacity: item.done ? 0.6 : 1,
+                                    border: item.done ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(255,255,255,0.08)',
+                                    '&:hover': {
+                                      transform: 'translateY(-4px)',
+                                      boxShadow: '0 12px 24px -10px rgba(0,0,0,0.5)',
+                                      borderColor: item.done ? 'rgba(255,255,255,0.02)' : 'primary.main',
+                                      opacity: 1
+                                    }
+                                  }}
+                                >
+                                  <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+                                      <Chip 
+                                        label={item.done ? "Completado" : "Pendiente"} 
+                                        size="small"
+                                        variant={item.done ? "outlined" : "filled"}
+                                        color={item.done ? "default" : "primary"}
+                                        sx={{ fontWeight: 600, fontSize: '0.75rem', height: 24 }}
+                                      />
+                                      {item.prioridad && (
+                                        <Chip
+                                          label={item.prioridad === 'HIGH' ? 'Alta' : item.prioridad === 'LOW' ? 'Baja' : 'Media'}
+                                          size="small"
+                                          color={item.prioridad === 'HIGH' ? 'error' : item.prioridad === 'LOW' ? 'default' : 'warning'}
+                                          sx={{ fontWeight: 600, fontSize: '0.7rem', height: 22 }}
+                                        />
+                                      )}
+                                    </Stack>
+
+                                    <Typography 
+                                      variant="body1" 
+                                      fontWeight="600" 
+                                      sx={{ 
+                                        textDecoration: item.done ? 'line-through' : 'none',
+                                        color: item.done ? 'text.secondary' : 'text.primary',
+                                        lineHeight: 1.5,
+                                        mb: 0.5
+                                      }}
+                                    >
+                                      {item.titulo || item.description}
+                                    </Typography>
+
+                                    {item.descripcion && item.descripcion !== item.titulo && (
+                                      <Typography 
+                                        variant="body2" 
+                                        sx={{ 
+                                          color: 'text.disabled',
+                                          fontSize: '0.8rem',
+                                          lineHeight: 1.4,
+                                          mb: 1.5,
+                                          display: '-webkit-box',
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: 'vertical',
+                                          overflow: 'hidden'
+                                        }}
+                                      >
+                                        {item.descripcion}
+                                      </Typography>
+                                    )}
+
+                                    <Stack spacing={0.5}>
+                                      {item.fechaFinEstimada && (
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                          <EventAvailableIcon sx={{ fontSize: 14, color: 'info.main' }} />
+                                          <Typography variant="caption" color="info.main" sx={{ fontWeight: 500 }}>
+                                            Est: <Moment format="MMM D, YYYY">{item.fechaFinEstimada}</Moment>
+                                          </Typography>
+                                        </Stack>
+                                      )}
+                                      {item.fechaFinReal && (
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                          <CalendarTodayIcon sx={{ fontSize: 14, color: item.done ? 'success.main' : 'warning.main' }} />
+                                          <Typography variant="caption" sx={{ color: item.done ? 'success.main' : 'warning.main', fontWeight: 500 }}>
+                                            Real: <Moment format="MMM D, YYYY">{item.fechaFinReal}</Moment>
+                                          </Typography>
+                                        </Stack>
+                                      )}
+                                    </Stack>
+                                  </CardContent>
+                                  <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => setEditingTask(item)}
+                                      title="Editar tarea"
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color={item.done ? 'default' : 'success'}
+                                      onClick={(event) => toggleDone(event, item.id, item.description, !item.done)}
+                                    >
+                                      {item.done ? <UndoIcon fontSize="small" /> : <CheckCircleOutlineIcon fontSize="small" />}
+                                    </IconButton>
+                                    <IconButton 
+                                      size="small" 
+                                      color="error" 
+                                      onClick={() => deleteItem(item.id)}
+                                    >
+                                      <DeleteOutlineIcon fontSize="small" />
+                                    </IconButton>
+                                  </CardActions>
+                                </Card>
+                              </Fade>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Box>
+                    </Collapse>
+                  </Paper>
+                </Box>
+              ))}
               
               <Box mt={8}>
                 <KpiDashboard />
@@ -428,7 +526,7 @@ function App() {
         onClose={() => setEditingTask(null)}
         onSave={handleEditTask}
         users={users}
-        sprints={sprints}
+        sprints={sprints.map(s => ({ id: s.id, name: s.name }))}
       />
     </Box>
   );

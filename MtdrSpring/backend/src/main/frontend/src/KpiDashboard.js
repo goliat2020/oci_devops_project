@@ -48,8 +48,8 @@ export default function KpiDashboard() {
     }));
   };
 
-  const tasksByState = useMemo(() => buildChartData(data?.tasksByState, 'estadoNombre', 'totalTareas'), [data]);
-  const tasksByPriority = useMemo(() => buildChartData(data?.tasksByPriority, 'prioridad', 'totalTareas'), [data]);
+  const tasksByState = useMemo(() => buildChartData(data?.tasksByState, 'name', 'totalTareas'), [data]);
+  const tasksByPriority = useMemo(() => buildChartData(data?.tasksByPriority, 'name', 'totalTareas'), [data]);
 
   const uniqueUsers = useMemo(() => {
     if (!data) return [];
@@ -77,7 +77,7 @@ export default function KpiDashboard() {
     // Group by User + Sprint composite name to avoid collisions in chart
     return filtered.map(t => ({
       name: `${t.userNombre || 'User'} (${t.sprintNombre || 'Sprint'})`,
-      value: t.totalTareas
+      value: t.value || t.totalTareas || 0
     }));
   }, [data, selectedUser, selectedSprint]);
 
@@ -89,7 +89,7 @@ export default function KpiDashboard() {
     );
     return filtered.map(h => ({
       name: `${h.userNombre || 'User'} (${h.sprintNombre || 'Sprint'})`,
-      value: h.horasReales || 0
+      value: h.value || h.horasReales || 0
     }));
   }, [data, selectedUser, selectedSprint]);
 
@@ -109,9 +109,11 @@ export default function KpiDashboard() {
   if (!data) return null;
 
   const totalTasks = data.tasksByState?.reduce((acc, curr) => acc + curr.totalTareas, 0) || 0;
-  const completedTasks = data.tasksByState?.find(s => s.estadoNombre === 'Done')?.totalTareas || 0;
+  const completedTasks = data.tasksByState?.find(s => 
+    s.name === 'Done' || s.name === 'Completada' || s.name === 'Completado'
+  )?.totalTareas || 0;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const totalHours = data.realHoursByUserSprint?.reduce((acc, curr) => acc + (curr.horasReales || 0), 0) || 0;
+  const totalHours = data.realHoursByUserSprint?.reduce((acc, curr) => acc + (curr.value || curr.horasReales || 0), 0) || 0;
 
   const StatCard = ({ title, value, subtitle, icon, valueColor = 'text.primary' }) => (
     <Card 

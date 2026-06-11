@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
   TextField, 
-  IconButton, 
   Grid, 
   Select, 
   MenuItem, 
@@ -22,6 +21,8 @@ function NewItem(props) {
   const [horasReales, setHorasReales] = useState('');
   const [idUsuario, setIdUsuario] = useState('');
   const [idSprint, setIdSprint] = useState('');
+  const [fechaFinEstimada, setFechaFinEstimada] = useState('');
+  const [fechaFinReal, setFechaFinReal] = useState('');
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
 
@@ -49,22 +50,40 @@ function NewItem(props) {
       }
 
       try {
+        const sres = await fetch('/sprints');
+        if (sres.ok) {
+          const sdata = await sres.json();
+          if (Array.isArray(sdata)) {
+            const sList = sdata.map(s => ({ id: s.idSprint, name: s.nombre }));
+            if (mounted) {
+              setSprints(sList);
+              if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed fetching sprints for NewItem', e);
+      }
+
+      try {
         const kres = await fetch('/kpi/dashboard');
         if (kres.ok) {
           const payload = await kres.json();
           const tasks = payload.tasksCompletedByUserSprint || [];
           const hours = payload.realHoursByUserSprint || [];
 
-          const sprintMap = new Map();
-          tasks.concat(hours).forEach(p => {
-            if (p && (p.sprintId != null || p.sprintId === 0)) {
-              sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
+          if (sprints == null || sprints.length === 0) {
+            const sprintMap = new Map();
+            tasks.concat(hours).forEach(p => {
+              if (p && (p.sprintId != null || p.sprintId === 0)) {
+                sprintMap.set(p.sprintId, p.sprintNombre || `Sprint ${p.sprintId}`);
+              }
+            });
+            const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
+            if (mounted) {
+              setSprints(sList);
+              if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
             }
-          });
-          const sList = Array.from(sprintMap.entries()).map(([id, name]) => ({ id, name }));
-          if (mounted) {
-            setSprints(sList);
-            if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
           }
 
           if ((users == null || users.length === 0)) {
@@ -95,6 +114,8 @@ function NewItem(props) {
     setPrioridad('MEDIUM');
     setEstimacionHoras('');
     setHorasReales('');
+    setFechaFinEstimada('');
+    setFechaFinReal('');
   }
 
   async function handleSubmit(e) {
@@ -106,7 +127,9 @@ function NewItem(props) {
       estimacionHoras: estimacionHoras === '' ? null : Number(estimacionHoras),
       horasReales: horasReales === '' ? null : Number(horasReales),
       idUsuario: idUsuario === '' ? null : Number(idUsuario),
-      idSprint: idSprint === '' ? null : Number(idSprint)
+      idSprint: idSprint === '' ? null : Number(idSprint),
+      fechaFinEstimada: fechaFinEstimada || null,
+      fechaFinReal: fechaFinReal || null
     };
 
     try {
@@ -134,7 +157,7 @@ function NewItem(props) {
         <Grid item xs={12} md={6}>
           <TextField 
             fullWidth 
-            label="Título" 
+            label="Titulo" 
             variant="filled"
             value={titulo} 
             onChange={e => setTitulo(e.target.value)} 
@@ -144,7 +167,7 @@ function NewItem(props) {
         <Grid item xs={12} md={6}>
           <TextField 
             fullWidth 
-            label="Descripción detallada" 
+            label="Descripcion detallada" 
             variant="filled"
             value={descripcion} 
             onChange={e => setDescripcion(e.target.value)} 
@@ -171,6 +194,31 @@ function NewItem(props) {
             type="number"
             value={horasReales} 
             onChange={e => setHorasReales(e.target.value)} 
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+        </Grid>
+
+        <Grid item xs={6} sm={3}>
+          <TextField
+            fullWidth
+            label="Fin estimada"
+            variant="filled"
+            type="date"
+            value={fechaFinEstimada}
+            onChange={e => setFechaFinEstimada(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <TextField
+            fullWidth
+            label="Fin real"
+            variant="filled"
+            type="date"
+            value={fechaFinReal}
+            onChange={e => setFechaFinReal(e.target.value)}
+            InputLabelProps={{ shrink: true }}
             InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
           />
         </Grid>
@@ -220,7 +268,7 @@ function NewItem(props) {
               startIcon={<AddTaskIcon />}
               sx={{ px: 4, py: 1.2 }}
             >
-              Añadir Tarea
+              Anadir Tarea
             </Button>
           </Box>
         </Grid>
