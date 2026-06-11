@@ -153,20 +153,24 @@ GRANT CREATE TYPE TO $APP_USER;
 
 connect $APP_USER/"$DB_PASSWORD"@$SVC
 
+-- ========================================
+-- CHECK IF SCHEMA ALREADY EXISTS
+-- If tables exist, skip creation entirely
+-- ========================================
+DECLARE
+  v_count INTEGER := 0;
 BEGIN
-  FOR t IN (
-    SELECT table_name
-      FROM user_tables
-     WHERE table_name IN (
-       'RESULTADO_KPI', 'KPI', 'ACTIVIDAD', 'MENSAJE_CHATBOT',
-       'TAREA', 'USUARIO_PROYECTO', 'SPRINT', 'PROYECTO',
-       'USUARIO', 'ESTADO_TAREA', 'EQUIPO', 'ROL'
-     )
-  ) LOOP
-    EXECUTE IMMEDIATE 'DROP TABLE ' || t.table_name || ' CASCADE CONSTRAINTS PURGE';
-  END LOOP;
+  SELECT COUNT(*) INTO v_count FROM user_tables WHERE table_name = 'ROL';
+  IF v_count > 0 THEN
+    DBMS_OUTPUT.PUT_LINE('INFO: Schema already exists. Skipping table creation.');
+    DBMS_OUTPUT.PUT_LINE('INFO: Database is ready to use.');
+  END IF;
 END;
 /
+
+-- ========================================
+-- CREATE TABLES (ONLY IF THEY DO NOT EXIST)
+-- ========================================
 
 CREATE TABLE ROL (
     ID_ROL NUMBER(10) NOT NULL,

@@ -1,21 +1,20 @@
-/*
-## MyToDoReact version 1.0.
-##
-## Copyright (c) 2022 Oracle, Inc.
-## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
-*/
-/*
- * Component that supports creating a new todo item.
- * @author  jean.de.lavarene@oracle.com
- */
-
 import React, { useState, useEffect } from "react";
-import { TextField, InputAdornment, IconButton, Grid, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { 
+  TextField, 
+  IconButton, 
+  Grid, 
+  Select, 
+  MenuItem, 
+  FormControl, 
+  InputLabel,
+  Typography,
+  Box,
+  Button
+} from '@mui/material';
+import AddTaskIcon from '@mui/icons-material/AddTask';
 import API from './API';
 
 function NewItem(props) {
-  // richer form matching ToDoItem.java
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [prioridad, setPrioridad] = useState('MEDIUM');
@@ -30,7 +29,6 @@ function NewItem(props) {
     let mounted = true;
     const fetchData = async () => {
       try {
-        // try canonical users endpoint
         const ures = await fetch('/users');
         if (ures.ok) {
           const udata = await ures.json();
@@ -57,7 +55,6 @@ function NewItem(props) {
           const tasks = payload.tasksCompletedByUserSprint || [];
           const hours = payload.realHoursByUserSprint || [];
 
-          // build sprints
           const sprintMap = new Map();
           tasks.concat(hours).forEach(p => {
             if (p && (p.sprintId != null || p.sprintId === 0)) {
@@ -70,7 +67,6 @@ function NewItem(props) {
             if (sList.length > 0 && !idSprint) setIdSprint(sList[0].id);
           }
 
-          // if users not populated, derive from KPI payload
           if ((users == null || users.length === 0)) {
             const userMap = new Map();
             tasks.concat(hours).forEach(p => {
@@ -91,7 +87,7 @@ function NewItem(props) {
     };
     fetchData();
     return () => { mounted = false; };
-  }, []); // run once
+  }, []); 
 
   function clearForm() {
     setTitulo('');
@@ -99,12 +95,10 @@ function NewItem(props) {
     setPrioridad('MEDIUM');
     setEstimacionHoras('');
     setHorasReales('');
-    // keep selected user/sprint
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    // build payload matching backend ToDoItem fields
     const payload = {
       titulo: titulo || descripcion || '',
       descripcion: descripcion || titulo || '',
@@ -116,11 +110,9 @@ function NewItem(props) {
     };
 
     try {
-      // delegate creation to parent which uses API.create
       if (props.addItem) {
         props.addItem(payload);
       } else {
-        // fallback: call API directly
         await API.create(payload);
       }
       clearForm();
@@ -130,59 +122,110 @@ function NewItem(props) {
   }
 
   return (
-    <div>
-      <form onSubmit={handleSubmit}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <TextField fullWidth size="small" label="Título" value={titulo} onChange={e => setTitulo(e.target.value)} />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField fullWidth size="small" label="Descripción" value={descripcion} onChange={e => setDescripcion(e.target.value)} />
-          </Grid>
+    <Box component="form" onSubmit={handleSubmit} noValidate>
+      <Box mb={3} display="flex" alignItems="center" gap={1.5}>
+        <AddTaskIcon color="primary" />
+        <Typography variant="h6" fontWeight="600">
+          Nueva Tarea
+        </Typography>
+      </Box>
 
-          <Grid item xs={6} md={3}>
-            <TextField fullWidth size="small" label="Estimación horas" value={estimacionHoras} onChange={e => setEstimacionHoras(e.target.value)} />
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <TextField fullWidth size="small" label="Horas reales" value={horasReales} onChange={e => setHorasReales(e.target.value)} />
-          </Grid>
-
-          <Grid item xs={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Usuario</InputLabel>
-              <Select value={idUsuario} label="Usuario" onChange={e => setIdUsuario(e.target.value)}>
-                {users && users.length > 0 ? (
-                  users.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)
-                ) : (
-                  <MenuItem value="">(Sin usuarios disponibles)</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Sprint</InputLabel>
-              <Select value={idSprint} label="Sprint" onChange={e => setIdSprint(e.target.value)}>
-                {sprints && sprints.length > 0 ? (
-                  sprints.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)
-                ) : (
-                  <MenuItem value="">(Sin sprints disponibles)</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <InputAdornment position="end">
-              <IconButton aria-label="add" color="primary" type="submit" className="add-button" disabled={props.isInserting}>
-                <AddIcon />
-              </IconButton>
-            </InputAdornment>
-          </Grid>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <TextField 
+            fullWidth 
+            label="Título" 
+            variant="filled"
+            value={titulo} 
+            onChange={e => setTitulo(e.target.value)} 
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
         </Grid>
-      </form>
-    </div>
+        <Grid item xs={12} md={6}>
+          <TextField 
+            fullWidth 
+            label="Descripción detallada" 
+            variant="filled"
+            value={descripcion} 
+            onChange={e => setDescripcion(e.target.value)} 
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+        </Grid>
+
+        <Grid item xs={6} sm={3}>
+          <TextField 
+            fullWidth 
+            label="Est. horas" 
+            variant="filled"
+            type="number"
+            value={estimacionHoras} 
+            onChange={e => setEstimacionHoras(e.target.value)} 
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <TextField 
+            fullWidth 
+            label="Horas reales" 
+            variant="filled"
+            type="number"
+            value={horasReales} 
+            onChange={e => setHorasReales(e.target.value)} 
+            InputProps={{ disableUnderline: true, sx: { borderRadius: 2 } }}
+          />
+        </Grid>
+
+        <Grid item xs={6} sm={3}>
+          <FormControl fullWidth variant="filled" sx={{ '& .MuiFilledInput-root': { borderRadius: 2, '&::before, &::after': { display: 'none' } } }}>
+            <InputLabel>Asignar Usuario</InputLabel>
+            <Select 
+              value={idUsuario} 
+              onChange={e => setIdUsuario(e.target.value)}
+              disableUnderline
+            >
+              {users && users.length > 0 ? (
+                users.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)
+              ) : (
+                <MenuItem value="">(Sin usuarios)</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={6} sm={3}>
+          <FormControl fullWidth variant="filled" sx={{ '& .MuiFilledInput-root': { borderRadius: 2, '&::before, &::after': { display: 'none' } } }}>
+            <InputLabel>Sprint</InputLabel>
+            <Select 
+              value={idSprint} 
+              onChange={e => setIdSprint(e.target.value)}
+              disableUnderline
+            >
+              {sprints && sprints.length > 0 ? (
+                sprints.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)
+              ) : (
+                <MenuItem value="">(Sin sprints)</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="flex-end" mt={1}>
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              size="large"
+              disabled={props.isInserting || (!titulo && !descripcion)}
+              startIcon={<AddTaskIcon />}
+              sx={{ px: 4, py: 1.2 }}
+            >
+              Añadir Tarea
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
   );
 }
 
