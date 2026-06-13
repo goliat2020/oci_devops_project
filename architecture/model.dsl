@@ -20,11 +20,21 @@ workspace "OCI DevOps Project" "Task management Telegram bot deployed on Oracle 
 
             apiApp = container "Backend API" "Spring Boot application. Handles HTTP REST endpoints, Telegram bot polling, business logic, and database access." "Java 17 / Spring Boot 3" {
 
-                botHandler    = component "Telegram Bot Handler"  "Receives and dispatches Telegram commands (/start, /todo, /addtodo, /done, /help). Uses TelegramBots library."         "Spring @Component"
-                taskService   = component "Task Service"          "Orchestrates task CRUD operations. Validates input and applies business rules before persisting."                       "Spring @Service"
-                taskRepo      = component "Task Repository"       "JPA repository interface. Translates service calls to SQL queries against the Oracle database."                        "Spring Data JPA"
-                restController = component "REST Controller"      "Exposes /api/todolist endpoints consumed by the frontend SPA."                                                         "Spring @RestController"
-                authFilter    = component "Auth Filter"           "Validates Telegram user IDs on incoming bot commands. Rejects unregistered users."                                     "Spring OncePerRequestFilter"
+                botHandler    = component "Telegram Bot Handler"  "Receives and dispatches Telegram commands (/start, /todo, /addtodo, /done, /help). Uses TelegramBots library."         "Spring @Component" {
+                    url "https://github.com/goliat2020/oci_devops_project/blob/main/docs/diagrams/telegram-bot-handler.puml"
+                }
+                taskService   = component "Task Service"          "Orchestrates task CRUD operations. Validates input and applies business rules before persisting."                       "Spring @Service" {
+                    url "https://github.com/goliat2020/oci_devops_project/blob/main/docs/diagrams/task-service.puml"
+                }
+                taskRepo      = component "Task Repository"       "JPA repository interface. Translates service calls to SQL queries against the Oracle database."                        "Spring Data JPA" {
+                    url "https://github.com/goliat2020/oci_devops_project/blob/main/docs/diagrams/task-repository.puml"
+                }
+                restController = component "REST Controller"      "Exposes /api/todolist endpoints consumed by the frontend SPA."                                                         "Spring @RestController" {
+                    url "https://github.com/goliat2020/oci_devops_project/blob/main/docs/diagrams/rest-controller.puml"
+                }
+                authFilter    = component "Auth Filter"           "Validates Telegram user IDs on incoming bot commands. Rejects unregistered users."                                     "Spring OncePerRequestFilter" {
+                    url "https://github.com/goliat2020/oci_devops_project/blob/main/docs/diagrams/auth-filter.puml"
+                }
             }
 
             database = container "Oracle Autonomous Database" "Stores users and tasks. Accessed via Oracle Wallet TLS credentials." "Oracle ATP" "Database"

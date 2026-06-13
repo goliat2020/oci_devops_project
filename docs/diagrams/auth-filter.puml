@@ -1,0 +1,13 @@
+@startuml
+
+class WebSecurityConfiguration {
+	{method} +securityFilterChain ( http : HttpSecurity ) : SecurityFilterChain
+}
+
+
+
+
+
+hide methods
+
+@enduml

@@ -1,0 +1,37 @@
+name: Generate Level 4 Diagrams
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  generate-diagrams:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Generate PlantUML component diagrams
+        working-directory: MtdrSpring/backend
+        run: ./mvnw --batch-mode -DskipTests generate-sources
+
+      - name: Commit generated diagrams
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(diagrams): update generated level 4 plantuml"
+          file_pattern: docs/diagrams/*.puml
