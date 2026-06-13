@@ -1,22 +1,7 @@
 @startuml
 
-class ToDoItemBotController {
-	{field} -botProps : BotProps
-	{field} -deepSeekService : DeepSeekService
-	{field} {static} -logger : Logger
-	{field} -telegramBotToken : String
-	{field} -telegramClient : TelegramClient
-	{field} -toDoItemService : ToDoItemService
-	{method} +afterRegistration ( botSession : BotSession ) : void
-	{method} +consume ( update : Update ) : void
-	{method} +getBotToken () : String
-	{method} +getUpdatesConsumer () : LongPollingUpdateConsumer
-}
 
 
 
-
-
-hide methods
 
 @enduml

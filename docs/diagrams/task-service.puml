@@ -1,72 +1,7 @@
 @startuml
 
-class DeepSeekService {
-	{field} -httpClient : CloseableHttpClient
-	{field} -httpPost : HttpPost
-	{method} +generateText ( prompt : String ) : String
-}
-
-
-class GeminiService {
-	{field} -apiKey : String
-	{field} -apiUrl : String
-	{field} -httpClient : CloseableHttpClient
-	{field} {static} -log : Logger
-	{field} -objectMapper : ObjectMapper
-	{method} -buildPrompt ( request : AiPlanRequest ) : String
-	{method} -cleanupJsonText ( text : String ) : String
-	{method} -discoverGenerateContentUrlFromListModels () : Optional
-	{method} -extractModelText ( responseJson : JsonNode ) : String
-	{method} +generateTaskPlan ( request : AiPlanRequest ) : List
-	{method} -looksLikeModelNotFound ( message : String ) : boolean
-	{method} -parseTasks ( modelText : String , request : AiPlanRequest ) : List
-	{method} -sanitizeGeminiError ( message : String ) : String
-	{method} -scoreModel ( name : String ) : int
-	{method} -supportsGenerateContent ( modelNode : JsonNode ) : boolean
-	{method} -toGenerateContentUrl ( currentApiUrl : String , modelNameFromList : String ) : String
-	{method} -toListModelsUrl ( currentApiUrl : String ) : String
-}
-
-
-class KpiService {
-	{field} -toDoItemRepository : ToDoItemRepository
-	{method} +getDashboard ( sprintId : Integer ) : KpiDashboardResponse
-	{method} +getRealHoursByUserSprint ( sprintId : Integer ) : List
-	{method} +getTasksCompletedByUserSprint ( sprintId : Integer ) : List
-	{method} -mapPoints ( projections : List ) : List
-}
-
-
-class ToDoItemService {
-	{field} {static} -DEFAULT_PROJECT_ID : int
-	{field} {static} -ESTADO_TODO : int
-	{field} -toDoItemRepository : ToDoItemRepository
-	{method} +addToDoItem ( toDoItem : ToDoItem ) : ToDoItem
-	{method} +deleteToDoItem ( id : int ) : boolean
-	{method} +findAll () : List
-	{method} +getItemById ( id : int ) : ResponseEntity
-	{method} +getToDoItemById ( id : int ) : ToDoItem
-	{method} -mergeTask ( current : ToDoItem , incoming : ToDoItem ) : void
-	{method} -nextTaskId () : int
-	{method} -prepareTaskDefaults ( task : ToDoItem ) : void
-	{method} +updateToDoItem ( id : int , td : ToDoItem ) : ToDoItem
-}
-
-
-class UserService {
-	{field} -userRepository : UserRepository
-	{method} +addUser ( newUser : User ) : User
-	{method} +deleteUser ( id : int ) : boolean
-	{method} +findAll () : List
-	{method} +getUserById ( id : int ) : ResponseEntity
-	{method} +test () : User
-	{method} +updateUser ( id : int , user2update : User ) : User
-}
 
 
 
-
-
-hide methods
 
 @enduml

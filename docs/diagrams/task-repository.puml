@@ -1,28 +1,7 @@
 @startuml
 
-interface KpiPointProjection {
-	{method}  {abstract} +getSprintId () : Integer
-	{method}  {abstract} +getSprintNombre () : String
-	{method}  {abstract} +getTotalValue () : Double
-	{method}  {abstract} +getUserId () : Integer
-	{method}  {abstract} +getUserNombre () : String
-}
-
-
-interface ToDoItemRepository {
-	{method}  {abstract} +findAllByOrderByIDDesc () : List
-	{method}  {abstract} +findRealHoursByUserAndSprint ( sprintId : Integer ) : List
-	{method}  {abstract} +findTasksCompletedByUserAndSprint ( sprintId : Integer ) : List
-}
-
-
-interface UserRepository {
-}
 
 
 
-
-
-hide methods
 
 @enduml

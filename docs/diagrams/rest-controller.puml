@@ -1,66 +1,7 @@
 @startuml
 
-class AiPlannerController {
-	{field} {static} -RETRY_DELAY_SECONDS : Pattern
-	{field} {static} -RETRY_IN_SECONDS : Pattern
-	{field} -geminiService : GeminiService
-	{method} -extractRetryAfterSeconds ( detail : String ) : Integer
-	{method} +generatePlan ( request : AiPlanRequest ) : ResponseEntity
-}
-
-
-class KpiController {
-	{field} -kpiService : KpiService
-	{method} +getDashboard ( sprintId : Integer ) : KpiDashboardResponse
-	{method} +getRealHoursByUserSprint ( sprintId : Integer ) : List
-	{method} +getTasksCompletedByUserSprint ( sprintId : Integer ) : List
-}
-
-
-class ToDoItemBotController {
-	{field} -botProps : BotProps
-	{field} -deepSeekService : DeepSeekService
-	{field} {static} -logger : Logger
-	{field} -telegramBotToken : String
-	{field} -telegramClient : TelegramClient
-	{field} -toDoItemService : ToDoItemService
-	{method} +afterRegistration ( botSession : BotSession ) : void
-	{method} +consume ( update : Update ) : void
-	{method} +getBotToken () : String
-	{method} +getUpdatesConsumer () : LongPollingUpdateConsumer
-}
-
-
-class ToDoItemController {
-	{field} -objectMapper : ObjectMapper
-	{field} -toDoItemService : ToDoItemService
-	{method} +addTask ( rawBody : String ) : ResponseEntity
-	{method} +addToDoItem ( rawBody : String ) : ResponseEntity
-	{method} +deleteTask ( id : int ) : ResponseEntity
-	{method} +deleteToDoItem ( id : int ) : ResponseEntity
-	{method} +getAllTasks () : List
-	{method} +getAllToDoItems () : List
-	{method} +getTaskById ( id : int ) : ResponseEntity
-	{method} +getToDoItemById ( id : int ) : ResponseEntity
-	{method} +updateTask ( toDoItem : ToDoItem , id : int ) : ResponseEntity
-	{method} +updateToDoItem ( toDoItem : ToDoItem , id : int ) : ResponseEntity
-}
-
-
-class UserController {
-	{field} -userService : UserService
-	{method} +addUser ( newUser : User ) : ResponseEntity
-	{method} +deleteUser ( id : int ) : ResponseEntity
-	{method} +getAllUsers () : List
-	{method} +getUserById ( id : int ) : ResponseEntity
-	{method} +test () : User
-	{method} +updateUser ( user : User , id : int ) : ResponseEntity
-}
 
 
 
-
-
-hide methods
 
 @enduml
